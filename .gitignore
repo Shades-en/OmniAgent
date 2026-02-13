@@ -1,0 +1,11 @@
+.env
+__pycache__
+venv
+.venv
+.eggs
+.eggs/
+.temp/
+.tmp/
+.vscode/settings.json
+
+.windsurf/plans

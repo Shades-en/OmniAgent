@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "omniagent"
+version = "0.1.0"
+description = "OmniAgent is an extensible agent runtime and orchestration framework that enables interoperable, multi-agent systems across AI SDK frontends, MCP, and external applications. Built for scalability, composability, and production-grade agent infrastructure."
+readme = "README.md"
+authors = [{ name="Owais Iqbal", email="owaisiqbal2013@gmail.com" }]
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+keywords = ["ai", "agents", "multi-agent", "mcp", "agent-runtime"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "arize-otel>=0.10.0",
+    "beanie[srv]>=2.0.1",
+    "dotenv>=0.9.9",
+    "langchain>=0.3.27",
+    "langchain-openai>=0.3.29",
+    "openai>=1.99.1",
+    "openinference-instrumentation-langchain>=0.1.56",
+    "openinference-instrumentation-openai>=0.1.39",
+    "opentelemetry-exporter-otlp>=1.37.0",
+    "opentelemetry-instrumentation-pymongo>=0.58b0",
+    "opentelemetry-instrumentation-redis>=0.58b0",
+    "tiktoken>=0.11.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pylint>=3.3.8"
+]
+
+[project.urls]
+repository = "https://github.com/Shades-en/OmniAgent"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/omniagent"]
