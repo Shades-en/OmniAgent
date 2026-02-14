@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Callable, Awaitable, Any
 import inspect
 
-from ai_server import config
-from ai_server.schemas.summary import Summary
-from ai_server.types.message import MessageDTO
-from ai_server.ai.tools.tools import Tool
-from ai_server.config import BASE_MODEL, AISDK_ID_LENGTH
-from ai_server.utils.general import generate_id
+from omniagent import config
+from omniagent.schemas.summary import Summary
+from omniagent.types.message import MessageDTO
+from omniagent.ai.tools.tools import Tool
+from omniagent.config import BASE_MODEL, AISDK_ID_LENGTH
+from omniagent.utils.general import generate_id
 
 
 StreamEvent = dict[str, Any]

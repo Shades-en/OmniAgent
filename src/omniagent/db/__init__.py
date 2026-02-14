@@ -4,8 +4,8 @@ from beanie import init_beanie, Document
 from pymongo import AsyncMongoClient
 from opentelemetry.trace import SpanKind
 
-from ai_server.schemas import User, Session, Summary, Message
-from ai_server.utils.tracing import trace_operation, CustomSpanKinds
+from omniagent.schemas import User, Session, Summary, Message
+from omniagent.utils.tracing import trace_operation, CustomSpanKinds
 
 # All document models to register with Beanie
 DOCUMENT_MODELS: List[Type[Document]] = [

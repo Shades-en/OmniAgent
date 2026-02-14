@@ -2,7 +2,7 @@
 Reusable logging utility with colored output and OpenTelemetry trace_id injection.
 
 Recommended usage:
-    from ai_server.utils.logger import setup_logging
+    from omniagent.utils.logger import setup_logging
     import logging
     setup_logging(level="INFO")
     logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ import sys
 from datetime import datetime
 from typing import Optional, Union
 import hashlib
-from ai_server.utils.general import _env_flag
+from omniagent.utils.general import _env_flag
 
 try:
     from opentelemetry import trace

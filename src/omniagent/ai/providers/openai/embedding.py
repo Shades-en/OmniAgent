@@ -1,7 +1,7 @@
-from ai_server.ai.providers.embedding_provider import EmbeddingProvider
-from ai_server.utils.general import get_env_int
-from ai_server.config import BASE_EMBEDDING_MODEL
-from ai_server.constants import OPENAI
+from omniagent.ai.providers.embedding_provider import EmbeddingProvider
+from omniagent.utils.general import get_env_int
+from omniagent.config import BASE_EMBEDDING_MODEL
+from omniagent.constants import OPENAI
 
 import logging
 from langchain_openai import OpenAIEmbeddings

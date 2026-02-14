@@ -12,13 +12,13 @@ from enum import Enum
 
 from opentelemetry.trace import SpanKind
 
-from ai_server.api.exceptions.db_exceptions import (
+from omniagent.exceptions.db_exceptions import (
     UserRetrievalFailedException,
     UserDeletionFailedException
 )
-from ai_server.utils.tracing import trace_operation, CustomSpanKinds
-from ai_server.schemas.message import Message
-from ai_server.schemas.summary import Summary
+from omniagent.utils.tracing import trace_operation, CustomSpanKinds
+from omniagent.schemas.message import Message
+from omniagent.schemas.summary import Summary
 
 
 class UserType(Enum):
@@ -207,8 +207,8 @@ class User(Document):
         
         Traced as INTERNAL span for database transaction with cascade delete.
         """
-        from ai_server.db import MongoDB
-        from ai_server.schemas.session import Session
+        from omniagent.db import MongoDB
+        from omniagent.schemas.session import Session
 
         client = MongoDB.get_client()
         

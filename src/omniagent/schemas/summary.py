@@ -10,16 +10,16 @@ from pydantic import Field
 from typing import TYPE_CHECKING, Self
 from pydantic import model_validator
 
-from ai_server.utils.tracing import trace_method
+from omniagent.utils.tracing import trace_method
 
 if TYPE_CHECKING:
-    from ai_server.schemas.session import Session
+    from omniagent.schemas.session import Session
 
-from ai_server.api.exceptions.db_exceptions import (
+from omniagent.exceptions.db_exceptions import (
     SummaryRetrievalFailedException,
     SummaryCreationFailedException,
 )
-from ai_server.utils.general import get_token_count
+from omniagent.utils.general import get_token_count
 
 class Summary(Document):
     content: str

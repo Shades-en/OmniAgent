@@ -2,25 +2,24 @@ from __future__ import annotations
 
 from opentelemetry.trace import SpanKind
 
-from ai_server import config
-from ai_server.ai.agents.agent import Agent
-from ai_server.ai.providers import get_llm_provider
-from ai_server.ai.providers.llm_provider import StreamCallback
-from ai_server.api.dto.chat import ChatRequestOptions
-from ai_server.api.exceptions.db_exceptions import (
+from omniagent import config
+from omniagent.ai.agents.agent import Agent
+from omniagent.ai.providers import get_llm_provider
+from omniagent.ai.providers.llm_provider import StreamCallback
+from omniagent.api.dto.chat import ChatRequestOptions, MessageQuery
+from omniagent.exceptions.db_exceptions import (
     SessionNotFoundException,
     UserNotFoundException,
     MessageRetrievalFailedException,
 )
-from ai_server.api.dto.chat import MessageQuery
-from ai_server.types.message import MessageDTO
-from ai_server.schemas import Summary
-from ai_server.session_manager import SessionManager
-from ai_server.api.exceptions.agent_exceptions import MaxStepsReachedException
-from ai_server.utils.tracing import trace_method
-from ai_server.utils.general import generate_id
-from ai_server.config import AISDK_ID_LENGTH
-from ai_server.ai.providers.utils import stream_fallback_response, dispatch_stream_event, create_finish_event
+from omniagent.types.message import MessageDTO
+from omniagent.schemas import Summary
+from omniagent.session_manager import SessionManager
+from omniagent.exceptions.agent_exceptions import MaxStepsReachedException
+from omniagent.utils.tracing import trace_method
+from omniagent.utils.general import generate_id
+from omniagent.config import AISDK_ID_LENGTH
+from omniagent.ai.providers.utils import stream_fallback_response, dispatch_stream_event, create_finish_event
 
 import asyncio
 from typing import List

@@ -77,7 +77,7 @@ def _env_flag(name: str, default: bool = False) -> bool:
 
 def get_token_count(text: str) -> int:
     """Count tokens in text using tiktoken encoder for BASE_MODEL."""
-    from ai_server.config import BASE_MODEL
+    from omniagent.config import BASE_MODEL
     
     global _tiktoken_encoder
     if _tiktoken_encoder is None:

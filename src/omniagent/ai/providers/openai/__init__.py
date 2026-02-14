@@ -1,7 +1,7 @@
-from ai_server.ai.providers.openai.base import OpenAIProvider
-from ai_server.ai.providers.openai.embedding import OpenAIEmbeddingProvider
-from ai_server.ai.providers.openai.responses import OpenAIResponsesAPI
-from ai_server.ai.providers.openai.chat_completion import OpenAIChatCompletionAPI
+from omniagent.ai.providers.openai.base import OpenAIProvider
+from omniagent.ai.providers.openai.embedding import OpenAIEmbeddingProvider
+from omniagent.ai.providers.openai.responses import OpenAIResponsesAPI
+from omniagent.ai.providers.openai.chat_completion import OpenAIChatCompletionAPI
 
 __all__ = [
     "OpenAIProvider",
@@ -9,4 +9,3 @@ __all__ = [
     "OpenAIResponsesAPI",
     "OpenAIChatCompletionAPI",
 ]
-

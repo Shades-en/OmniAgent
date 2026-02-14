@@ -1,6 +1,6 @@
-from ai_server.ai.providers.llm_provider import LLMProvider
-from ai_server.ai.providers.openai import OpenAIChatCompletionAPI, OpenAIResponsesAPI
-from ai_server.config import OPENAI
+from omniagent.ai.providers.llm_provider import LLMProvider
+from omniagent.ai.providers.openai import OpenAIChatCompletionAPI, OpenAIResponsesAPI
+from omniagent.config import OPENAI
 from typing import Literal
 
 def get_llm_provider(provider_name: str, api_type: Literal["responses", "chat_completion"] = "responses", **kwargs) -> LLMProvider:

@@ -9,7 +9,7 @@ This package provides common utilities for:
 - Distributed tracing with OpenTelemetry
 """
 
-from ai_server.utils.general import (
+from omniagent.utils.general import (
     generate_id,
     get_env_int,
     _env_flag,
@@ -18,23 +18,23 @@ from ai_server.utils.general import (
     generate_order,
 )
 
-from ai_server.utils.logger import (
+from omniagent.utils.logger import (
     OTelColorFormatter,
     setup_logging,
 )
 
-from ai_server.utils.singleton import (
+from omniagent.utils.singleton import (
     SingletonMeta,
     SingletonABCMeta,
 )
 
-from ai_server.utils.task_registry import (
+from omniagent.utils.task_registry import (
     register_task,
     cancel_task,
     unregister_task,
 )
 
-from ai_server.utils.tracing import (
+from omniagent.utils.tracing import (
     trace_context,
     set_trace_context,
     get_trace_context,

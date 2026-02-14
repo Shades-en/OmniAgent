@@ -512,7 +512,7 @@ def trace_operation(
         capture_output: Whether to capture function output as span attributes
     
     Example:
-        >>> from ai_server.constants import DATABASE
+        >>> from omniagent.constants import DATABASE
         >>> @trace_operation(kind=SpanKind.INTERNAL, category=DATABASE)
         ... @classmethod
         ... async def delete_message(cls, message_id: str):

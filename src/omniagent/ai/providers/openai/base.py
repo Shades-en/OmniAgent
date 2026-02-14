@@ -10,22 +10,22 @@ from openai.types.responses import Response
 from openai.types.chat.chat_completion import ChatCompletion
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from ai_server.ai.providers.llm_provider import LLMProvider
-from ai_server.ai.tools.tools import Tool
-from ai_server.ai.prompts.summary import CONVERSATION_SUMMARY_PROMPT
-from ai_server.ai.prompts.chat_name import CHAT_NAME_SYSTEM_PROMPT, CHAT_NAME_USER_PROMPT
-from ai_server.ai.providers.utils import (
+from omniagent.ai.providers.llm_provider import LLMProvider
+from omniagent.ai.tools.tools import Tool
+from omniagent.ai.prompts.summary import CONVERSATION_SUMMARY_PROMPT
+from omniagent.ai.prompts.chat_name import CHAT_NAME_SYSTEM_PROMPT, CHAT_NAME_USER_PROMPT
+from omniagent.ai.providers.utils import (
     create_tool_output_available_event,
     create_tool_output_error_event,
     create_finish_event,
     StreamCallback,
     dispatch_stream_event,
 )
-from ai_server.utils.general import get_token_count
-from ai_server.utils.tracing import trace_method
+from omniagent.utils.general import get_token_count
+from omniagent.utils.tracing import trace_method
 
-from ai_server.schemas.summary import Summary
-from ai_server.types.message import (
+from omniagent.schemas.summary import Summary
+from omniagent.types.message import (
     MessageDTO, 
     MessageHumanTextPart, 
     MessageAITextPart, 
@@ -33,13 +33,13 @@ from ai_server.types.message import (
     MessageToolPart,
     ToolPartState
 )
-from ai_server.config import (
+from omniagent.config import (
     BASE_MODEL, 
     MAX_TOKEN_THRESHOLD, 
     MAX_TURNS_TO_FETCH,
     CHAT_NAME_CONTEXT_MAX_MESSAGES,
 )
-from ai_server.constants import OPENAI
+from omniagent.constants import OPENAI
 
 logger = logging.getLogger(__name__)
 

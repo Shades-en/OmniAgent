@@ -9,9 +9,9 @@ The event builders follow the AI SDK stream protocol specification.
 
 from typing import Dict, Any, Callable, Awaitable
 
-from ai_server.utils.general import generate_id
-from ai_server.config import AISDK_ID_LENGTH
-from ai_server.constants import (
+from omniagent.utils.general import generate_id
+from omniagent.config import AISDK_ID_LENGTH
+from omniagent.constants import (
     STREAM_EVENT_START,
     STREAM_EVENT_TEXT_START,
     STREAM_EVENT_TEXT_DELTA,

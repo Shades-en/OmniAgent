@@ -1,6 +1,6 @@
 """Utility modules for AI providers."""
 
-from ai_server.ai.providers.utils.stream_events import (
+from omniagent.ai.providers.utils.stream_events import (
     create_start_event,
     create_text_start_event,
     create_text_delta_event,

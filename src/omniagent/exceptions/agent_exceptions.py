@@ -1,4 +1,4 @@
-from ai_server.api.exceptions.error import AppException
+from omniagent.exceptions.error import AppException
 
 
 class MaxStepsReachedException(AppException):

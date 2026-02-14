@@ -10,18 +10,18 @@ from datetime import datetime, timezone
 
 from opentelemetry.trace import SpanKind
 
-from ai_server.utils.tracing import trace_operation, CustomSpanKinds
-from ai_server.api.exceptions.db_exceptions import (
+from omniagent.utils.tracing import trace_operation, CustomSpanKinds
+from omniagent.exceptions.db_exceptions import (
     MessageRetrievalFailedException,
     MessageDeletionFailedException,
     MessageUpdateFailedException
 )
-from ai_server.config import DEFAULT_MESSAGE_PAGE_SIZE, MAX_TURNS_TO_FETCH
-from ai_server.types.message import Role, MessageAITextPart, MessageReasoningPart, MessageToolPart, MessageHumanTextPart, Feedback, MessageDTO
+from omniagent.config import DEFAULT_MESSAGE_PAGE_SIZE, MAX_TURNS_TO_FETCH
+from omniagent.types.message import Role, MessageAITextPart, MessageReasoningPart, MessageToolPart, MessageHumanTextPart, Feedback, MessageDTO
 
 if TYPE_CHECKING:
-    from ai_server.schemas.session import Session
-    from ai_server.schemas.summary import Summary
+    from omniagent.schemas.session import Session
+    from omniagent.schemas.summary import Summary
 
 class Message(Document):
     role: Role

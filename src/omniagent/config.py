@@ -1,7 +1,7 @@
-## Configuration file for the ai-server
+## Configuration file for OmniAgent
 
-from ai_server.constants import GPT_4_1_MINI, TEXT_EMBEDDING_3_SMALL, OPENAI
-from ai_server.utils.general import _env_flag
+from omniagent.constants import GPT_4_1_MINI, TEXT_EMBEDDING_3_SMALL, OPENAI
+from omniagent.utils.general import _env_flag
 
 import os
 

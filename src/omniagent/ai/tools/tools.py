@@ -4,8 +4,8 @@ from pydantic import BaseModel
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from ai_server.utils.tracing import trace_method
-from ai_server.types.tools import ToolArguments
+from omniagent.utils.tracing import trace_method
+from omniagent.types.tools import ToolArguments
 
 
 class RequireArgClassMeta(ABCMeta):

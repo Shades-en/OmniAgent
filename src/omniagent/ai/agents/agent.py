@@ -1,7 +1,7 @@
 from typing import List, Callable
 from abc import ABC
-from ai_server.ai.tools.tools import Tool
-from ai_server.types.state import State
+from omniagent.ai.tools.tools import Tool
+from omniagent.types.state import State
 
 class Agent(ABC):
     def __init__(

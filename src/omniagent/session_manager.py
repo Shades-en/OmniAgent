@@ -3,18 +3,18 @@ from typing import List, Tuple
 
 import logging
 
-from ai_server.types.state import State
-from ai_server.types.message import MessageDTO
-from ai_server.schemas import User, Session, Message, Summary
-from ai_server.config import MAX_TURNS_TO_FETCH, MAX_TOKEN_THRESHOLD
-from ai_server.api.exceptions.db_exceptions import (
+from omniagent.types.state import State
+from omniagent.types.message import MessageDTO
+from omniagent.schemas import User, Session, Message, Summary
+from omniagent.config import MAX_TURNS_TO_FETCH, MAX_TOKEN_THRESHOLD
+from omniagent.exceptions.db_exceptions import (
     SessionNotFoundException,
     UserNotFoundException,
 )
-from ai_server.utils.general import generate_id
-from ai_server.config import AISDK_ID_LENGTH
-from ai_server.utils.tracing import trace_method, track_state_change, CustomSpanKinds
-from ai_server.ai.providers.utils import StreamCallback, stream_fallback_response
+from omniagent.utils.general import generate_id
+from omniagent.config import AISDK_ID_LENGTH
+from omniagent.utils.tracing import trace_method, track_state_change, CustomSpanKinds
+from omniagent.ai.providers.utils import StreamCallback, stream_fallback_response
 
 logger = logging.getLogger(__name__)
 

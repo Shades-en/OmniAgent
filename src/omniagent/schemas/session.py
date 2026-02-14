@@ -12,20 +12,20 @@ import asyncio
 from opentelemetry.trace import SpanKind
 
 if TYPE_CHECKING:
-    from ai_server.schemas.message import Message
-    from ai_server.schemas.summary import Summary
+    from omniagent.schemas.message import Message
+    from omniagent.schemas.summary import Summary
 
-from ai_server.schemas.user import User
-from ai_server.types.message import MessageDTO
-from ai_server.api.exceptions.db_exceptions import (
+from omniagent.schemas.user import User
+from omniagent.types.message import MessageDTO
+from omniagent.exceptions.db_exceptions import (
     SessionRetrievalFailedException,
     SessionCreationFailedException,
     SessionUpdateFailedException,
     SessionDeletionFailedException,
     MessageCreationFailedException
 )
-from ai_server.config import DEFAULT_SESSION_NAME, DEFAULT_SESSION_PAGE_SIZE
-from ai_server.utils.tracing import trace_method, trace_operation, CustomSpanKinds
+from omniagent.config import DEFAULT_SESSION_NAME, DEFAULT_SESSION_PAGE_SIZE
+from omniagent.utils.tracing import trace_method, trace_operation, CustomSpanKinds
 
 
 class Session(Document):
@@ -154,7 +154,7 @@ class Session(Document):
         
         Traced as INTERNAL span for database transaction.
         """
-        from ai_server.db import MongoDB
+        from omniagent.db import MongoDB
 
         if not session_id:
             raise SessionCreationFailedException(
@@ -372,9 +372,9 @@ class Session(Document):
         
         Traced as INTERNAL span for database transaction with cascade delete.
         """
-        from ai_server.schemas.message import Message
-        from ai_server.schemas.summary import Summary
-        from ai_server.db import MongoDB
+        from omniagent.schemas.message import Message
+        from omniagent.schemas.summary import Summary
+        from omniagent.db import MongoDB
         
         try:
             obj_id = ObjectId(user_id)
@@ -438,9 +438,9 @@ class Session(Document):
         
         Traced as INTERNAL span for database transaction with cascade delete.
         """
-        from ai_server.schemas.message import Message
-        from ai_server.schemas.summary import Summary
-        from ai_server.db import MongoDB
+        from omniagent.schemas.message import Message
+        from omniagent.schemas.summary import Summary
+        from omniagent.db import MongoDB
         
         try:
             session = await cls.get_by_id(session_id, user_id)
@@ -520,7 +520,7 @@ class Session(Document):
             return []
         
         try:
-            from ai_server.schemas.message import Message
+            from omniagent.schemas.message import Message
 
             # Convert MessageDTOs to Message documents
             message_docs = []
@@ -538,7 +538,7 @@ class Session(Document):
                 message_docs.append(message_doc)
 
             # Insert messages using Beanie with transaction - shield from cancellation
-            from ai_server.db import MongoDB
+            from omniagent.db import MongoDB
 
             async def _do_insert():
                 client = MongoDB.get_client()

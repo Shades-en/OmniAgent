@@ -1,6 +1,6 @@
-from ai_server.ai.providers.openai.base import OpenAIProvider
-from ai_server.ai.providers.llm_provider import StreamCallback, dispatch_stream_event
-from ai_server.ai.providers.utils import (
+from omniagent.ai.providers.openai.base import OpenAIProvider
+from omniagent.ai.providers.llm_provider import StreamCallback, dispatch_stream_event
+from omniagent.ai.providers.utils import (
     create_start_event,
     create_text_start_event,
     create_text_delta_event,
@@ -9,11 +9,11 @@ from ai_server.ai.providers.utils import (
     create_tool_input_delta_event,
     create_tool_input_available_event,
 )
-from ai_server.ai.tools.tools import Tool
-from ai_server.types.message import MessageDTO, Role, MessageAITextPart, MessageToolPart, ToolPartState
-from ai_server.config import BASE_MODEL
-from ai_server.utils.tracing import trace_method
-from ai_server.api.exceptions.schema_exceptions import MessageParseException
+from omniagent.ai.tools.tools import Tool
+from omniagent.types.message import MessageDTO, Role, MessageAITextPart, MessageToolPart, ToolPartState
+from omniagent.config import BASE_MODEL
+from omniagent.utils.tracing import trace_method
+from omniagent.exceptions.schema_exceptions import MessageParseException
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
