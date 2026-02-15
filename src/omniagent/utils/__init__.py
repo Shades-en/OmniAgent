@@ -14,7 +14,6 @@ from omniagent.utils.general import (
     get_env_int,
     _env_flag,
     get_token_count,
-    safe_get_arg,
     generate_order,
 )
 
@@ -53,7 +52,6 @@ __all__ = [
     "get_env_int",
     "_env_flag",
     "get_token_count",
-    "safe_get_arg",
     "generate_order",
     # Logging
     "OTelColorFormatter",

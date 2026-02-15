@@ -13,7 +13,7 @@ from omniagent.ai.tools.tools import Tool
 from omniagent.types.message import MessageDTO, Role, MessageAITextPart, MessageToolPart, ToolPartState
 from omniagent.config import BASE_MODEL
 from omniagent.utils.tracing import trace_method
-from omniagent.exceptions.schema_exceptions import MessageParseException
+from omniagent.exceptions import MessageParseError
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
@@ -143,7 +143,7 @@ class OpenAIChatCompletionAPI(OpenAIProvider):
                 return True
             return False
         except ValidationError as e:
-            raise MessageParseException(message="Failed to parse AI response from openai chat completion", note=str(e))
+            raise MessageParseError("Failed to parse AI response from openai chat completion", details=str(e))
 
     @classmethod
     async def _stream_chat_completion(

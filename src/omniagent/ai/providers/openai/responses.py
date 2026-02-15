@@ -31,8 +31,7 @@ from omniagent.constants import (
 
 from omniagent.utils.tracing import trace_method
 
-from omniagent.exceptions.openai_exceptions import UnrecognizedMessageTypeException
-from omniagent.exceptions.schema_exceptions import MessageParseException
+from omniagent.exceptions import UnrecognizedMessageTypeError, MessageParseError
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
@@ -297,7 +296,7 @@ class OpenAIResponsesAPI(OpenAIProvider):
                 elif resp.type == "message":
                     ai_message.update_ai_text_message(text=resp.content[0].text)
                 else:
-                    raise UnrecognizedMessageTypeException(message="Unrecognized message type", note=f"Message type: {resp.type} - Implementation does not exist")
+                    raise UnrecognizedMessageTypeError("Unrecognized message type", details=f"Message type: {resp.type} - Implementation does not exist")
             
             # Execute all function calls in parallel and create tool messages
             if function_call_tasks:
@@ -310,7 +309,7 @@ class OpenAIResponsesAPI(OpenAIProvider):
                 return True
             return False
         except ValidationError as e:
-            raise MessageParseException(message="Failed to parse AI response from openai responses", note=str(e))
+            raise MessageParseError("Failed to parse AI response from openai responses", details=str(e))
 
     @classmethod
     def _convert_tools_to_openai_compatible(cls, tools: List[Tool]) -> List[Dict]:

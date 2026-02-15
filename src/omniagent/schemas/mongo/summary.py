@@ -13,11 +13,11 @@ from pydantic import model_validator
 from omniagent.utils.tracing import trace_method
 
 if TYPE_CHECKING:
-    from omniagent.schemas.session import Session
+    from omniagent.schemas.mongo.session import Session
 
-from omniagent.exceptions.db_exceptions import (
-    SummaryRetrievalFailedException,
-    SummaryCreationFailedException,
+from omniagent.exceptions import (
+    SummaryRetrievalError,
+    SummaryCreationError,
 )
 from omniagent.utils.general import get_token_count
 
@@ -53,9 +53,9 @@ class Summary(Document):
                 cls.session._id == ObjectId(session_id)
             ).sort(-cls.created_at).first_or_none()
         except Exception as e:
-            raise SummaryRetrievalFailedException(
-                message="Failed to retrieve latest summary by session ID",
-                note=f"session_id={session_id}, error={str(e)}"
+            raise SummaryRetrievalError(
+                "Failed to retrieve latest summary by session ID",
+                details=f"session_id={session_id}, error={str(e)}"
             )
 
     @classmethod
@@ -72,7 +72,7 @@ class Summary(Document):
             await summary.insert()
             return summary
         except Exception as e:
-            raise SummaryCreationFailedException(
-                message="Failed to create summary for session",
-                note=f"session_id={session.id}, summary={summary}, error={str(e)}"
+            raise SummaryCreationError(
+                "Failed to create summary for session",
+                details=f"session_id={session.id}, summary={summary}, error={str(e)}"
             )

@@ -12,17 +12,17 @@ import asyncio
 from opentelemetry.trace import SpanKind
 
 if TYPE_CHECKING:
-    from omniagent.schemas.message import Message
-    from omniagent.schemas.summary import Summary
+    from omniagent.schemas.mongo.message import Message
+    from omniagent.schemas.mongo.summary import Summary
 
-from omniagent.schemas.user import User
+from omniagent.schemas.mongo.user import User
 from omniagent.types.message import MessageDTO
-from omniagent.exceptions.db_exceptions import (
-    SessionRetrievalFailedException,
-    SessionCreationFailedException,
-    SessionUpdateFailedException,
-    SessionDeletionFailedException,
-    MessageCreationFailedException
+from omniagent.exceptions import (
+    SessionRetrievalError,
+    SessionCreationError,
+    SessionUpdateError,
+    SessionDeletionError,
+    MessageCreationError,
 )
 from omniagent.config import DEFAULT_SESSION_NAME, DEFAULT_SESSION_PAGE_SIZE
 from omniagent.utils.tracing import trace_method, trace_operation, CustomSpanKinds
@@ -56,7 +56,7 @@ class Session(Document):
             Session if found and belongs to user, None otherwise
             
         Raises:
-            SessionRetrievalFailedException: If retrieval fails
+            SessionRetrievalError: If retrieval fails
         """
         try:
             user_obj_id = ObjectId(user_id)
@@ -69,9 +69,9 @@ class Session(Document):
             )
             return session
         except Exception as e:
-            raise SessionRetrievalFailedException(
-                message="Failed to retrieve session by ID",
-                note=f"session_id={session_id}, user_id={user_id}, error={str(e)}"
+            raise SessionRetrievalError(
+                "Failed to retrieve session by ID",
+                details=f"session_id={session_id}, user_id={user_id}, error={str(e)}"
             )
     
     @classmethod
@@ -88,7 +88,7 @@ class Session(Document):
             Session if found and belongs to user, None otherwise
             
         Raises:
-            SessionRetrievalFailedException: If retrieval fails
+            SessionRetrievalError: If retrieval fails
         """
         try:
             pipeline = [
@@ -120,9 +120,9 @@ class Session(Document):
                 return None
             return cls.model_validate(results[0])
         except Exception as e:
-            raise SessionRetrievalFailedException(
-                message="Failed to retrieve session by ID and cookie",
-                note=f"session_id={session_id}, cookie_id={cookie_id}, error={str(e)}"
+            raise SessionRetrievalError(
+                "Failed to retrieve session by ID and cookie",
+                details=f"session_id={session_id}, cookie_id={cookie_id}, error={str(e)}"
             )
     
     @classmethod
@@ -150,16 +150,16 @@ class Session(Document):
             Created Session document
             
         Raises:
-            SessionCreationFailedException: If transaction fails or session_id not provided
+            SessionCreationError: If transaction fails or session_id not provided
         
         Traced as INTERNAL span for database transaction.
         """
         from omniagent.db import MongoDB
 
         if not session_id:
-            raise SessionCreationFailedException(
-                message="session_id is required to create a session",
-                note="session_id parameter must be provided"
+            raise SessionCreationError(
+                "session_id is required to create a session",
+                details="session_id parameter must be provided"
             )
 
         client = MongoDB.get_client()
@@ -187,9 +187,9 @@ class Session(Document):
                     
             except Exception as e:
                 # Transaction will automatically abort on exception
-                raise SessionCreationFailedException(
-                    message="Failed to create session with user in transaction",
-                    note=f"cookie_id={cookie_id}, session_id={session_id}, session_name={session_name}, error={str(e)}"
+                raise SessionCreationError(
+                    "Failed to create session with user in transaction",
+                    details=f"cookie_id={cookie_id}, session_id={session_id}, session_name={session_name}, error={str(e)}"
                 )
     
     @classmethod
@@ -211,18 +211,18 @@ class Session(Document):
             Created Session document
             
         Raises:
-            SessionCreationFailedException: If session creation fails, user has no id, or session_id not provided
+            SessionCreationError: If session creation fails, user has no id, or session_id not provided
         """
         if not user.id:
-            raise SessionCreationFailedException(
-                message="Cannot create session for user without id",
-                note="User must be saved to database before creating a session"
+            raise SessionCreationError(
+                "Cannot create session for user without id",
+                details="User must be saved to database before creating a session"
             )
 
         if not session_id:
-            raise SessionCreationFailedException(
-                message="session_id is required to create a session",
-                note="session_id parameter must be provided"
+            raise SessionCreationError(
+                "session_id is required to create a session",
+                details="session_id parameter must be provided"
             )
         
         try:
@@ -239,9 +239,9 @@ class Session(Document):
             return new_session
             
         except Exception as e:
-            raise SessionCreationFailedException(
-                message="Failed to create session for existing user",
-                note=f"user_id={user.id}, session_id={session_id}, session_name={session_name}, error={str(e)}"
+            raise SessionCreationError(
+                "Failed to create session for existing user",
+                details=f"user_id={user.id}, session_id={session_id}, session_name={session_name}, error={str(e)}"
             )
 
     async def _update_latest_turn_number(self, turn_number: int, session=None) -> None:
@@ -254,13 +254,13 @@ class Session(Document):
             session: Optional MongoDB session for transaction support
             
         Raises:
-            SessionUpdateFailedException: If update fails
+            SessionUpdateError: If update fails
         """
         try:
             if not self.id:
-                raise SessionUpdateFailedException(
-                    message="Cannot update latest turn number for non-existent session",
-                    note=f"session_id={self.id}, turn_number={turn_number}"
+                raise SessionUpdateError(
+                    "Cannot update latest turn number for non-existent session",
+                    details=f"session_id={self.id}, turn_number={turn_number}"
                 )
             
             self.latest_turn_number = turn_number
@@ -271,9 +271,9 @@ class Session(Document):
                 await self.save()
             
         except Exception as e:
-            raise SessionUpdateFailedException(
-                message="Failed to update latest turn number for session",
-                note=f"session_id={self.id}, turn_number={turn_number}, error={str(e)}"
+            raise SessionUpdateError(
+                "Failed to update latest turn number for session",
+                details=f"session_id={self.id}, turn_number={turn_number}, error={str(e)}"
             )
     
     async def update_name(self, new_name: str) -> None:
@@ -284,12 +284,12 @@ class Session(Document):
             new_name: New name for the session
             
         Raises:
-            SessionUpdateFailedException: If update fails
+            SessionUpdateError: If update fails
         """
         if not self.id:
-            raise SessionUpdateFailedException(
-                message="Cannot update name for unsaved session",
-                note="Session must be saved to database before updating name"
+            raise SessionUpdateError(
+                "Cannot update name for unsaved session",
+                details="Session must be saved to database before updating name"
             )
         
         try:
@@ -297,9 +297,9 @@ class Session(Document):
             await self.save()
             
         except Exception as e:
-            raise SessionUpdateFailedException(
-                message="Failed to update session name",
-                note=f"session_id={self.id}, new_name={new_name}, error={str(e)}"
+            raise SessionUpdateError(
+                "Failed to update session name",
+                details=f"session_id={self.id}, new_name={new_name}, error={str(e)}"
             )
     
     @classmethod
@@ -321,7 +321,7 @@ class Session(Document):
             }
             
         Raises:
-            SessionUpdateFailedException: If update fails
+            SessionUpdateError: If update fails
         
         Traced as INTERNAL span for database operation.
         """
@@ -329,9 +329,9 @@ class Session(Document):
             session = await cls.get_by_id(session_id, user_id)
             
             if not session:
-                raise SessionUpdateFailedException(
-                    message="Session not found",
-                    note=f"session_id={session_id}"
+                raise SessionUpdateError(
+                    "Session not found",
+                    details=f"session_id={session_id}"
                 )
             
             session.starred = starred
@@ -343,12 +343,12 @@ class Session(Document):
                 "starred": starred
             }
                     
-        except SessionUpdateFailedException:
+        except SessionUpdateError:
             raise
         except Exception as e:
-            raise SessionUpdateFailedException(
-                message="Failed to update session starred status",
-                note=f"session_id={session_id}, starred={starred}, error={str(e)}"
+            raise SessionUpdateError(
+                "Failed to update session starred status",
+                details=f"session_id={session_id}, starred={starred}, error={str(e)}"
             )
     
     @classmethod
@@ -368,12 +368,12 @@ class Session(Document):
             }
         
         Raises:
-            SessionDeletionFailedException: If deletion fails
+            SessionDeletionError: If deletion fails
         
         Traced as INTERNAL span for database transaction with cascade delete.
         """
-        from omniagent.schemas.message import Message
-        from omniagent.schemas.summary import Summary
+        from omniagent.schemas.mongo.message import Message
+        from omniagent.schemas.mongo.summary import Summary
         from omniagent.db import MongoDB
         
         try:
@@ -410,9 +410,9 @@ class Session(Document):
                     }
                     
         except Exception as e:
-            raise SessionDeletionFailedException(
-                message="Failed to delete all sessions for user",
-                note=f"user_id={user_id}, error={str(e)}"
+            raise SessionDeletionError(
+                "Failed to delete all sessions for user",
+                details=f"user_id={user_id}, error={str(e)}"
             )
     
     @classmethod
@@ -434,12 +434,12 @@ class Session(Document):
             }
         
         Raises:
-            SessionDeletionFailedException: If deletion fails
+            SessionDeletionError: If deletion fails
         
         Traced as INTERNAL span for database transaction with cascade delete.
         """
-        from omniagent.schemas.message import Message
-        from omniagent.schemas.summary import Summary
+        from omniagent.schemas.mongo.message import Message
+        from omniagent.schemas.mongo.summary import Summary
         from omniagent.db import MongoDB
         
         try:
@@ -474,9 +474,9 @@ class Session(Document):
                     }
                     
         except Exception as e:
-            raise SessionDeletionFailedException(
-                message="Failed to delete session with related documents",
-                note=f"session_id={session_id}, error={str(e)}"
+            raise SessionDeletionError(
+                "Failed to delete session with related documents",
+                details=f"session_id={session_id}, error={str(e)}"
             )
     
     @trace_method(
@@ -506,21 +506,21 @@ class Session(Document):
             List of inserted Message documents
             
         Raises:
-            MessageCreationFailedException: If bulk insert fails
+            MessageCreationError: If bulk insert fails
         
         Traced as INTERNAL span for database operation.
         """
         if not self.id:
-            raise MessageCreationFailedException(
-                message="Cannot insert messages for unsaved session",
-                note="Session must be saved to database before inserting messages"
+            raise MessageCreationError(
+                "Cannot insert messages for unsaved session",
+                details="Session must be saved to database before inserting messages"
             )
         
         if not messages:
             return []
         
         try:
-            from omniagent.schemas.message import Message
+            from omniagent.schemas.mongo.message import Message
 
             # Convert MessageDTOs to Message documents
             message_docs = []
@@ -552,9 +552,9 @@ class Session(Document):
             return message_docs
             
         except Exception as e:
-            raise MessageCreationFailedException(
-                message="Failed to bulk insert messages for session",
-                note=f"session_id={self.id}, turn_number={turn_number}, message_count={len(messages)}, error={str(e)}"
+            raise MessageCreationError(
+                "Failed to bulk insert messages for session",
+                details=f"session_id={self.id}, turn_number={turn_number}, message_count={len(messages)}, error={str(e)}"
             )
     
     @classmethod
@@ -577,7 +577,7 @@ class Session(Document):
             List of Session documents sorted by most recent first
             
         Raises:
-            SessionRetrievalFailedException: If retrieval fails
+            SessionRetrievalError: If retrieval fails
         """
         try:
             skip = (page - 1) * page_size
@@ -617,9 +617,9 @@ class Session(Document):
             return [cls.model_validate(session) for session in sessions]
             
         except Exception as e:
-            raise SessionRetrievalFailedException(
-                message="Failed to retrieve paginated sessions for user by cookie",
-                note=f"cookie_id={cookie_id}, page={page}, page_size={page_size}, error={str(e)}"
+            raise SessionRetrievalError(
+                "Failed to retrieve paginated sessions for user by cookie",
+                details=f"cookie_id={cookie_id}, page={page}, page_size={page_size}, error={str(e)}"
             )
     
     @classmethod
@@ -635,7 +635,7 @@ class Session(Document):
             List of all Session documents sorted by most recent first
             
         Raises:
-            SessionRetrievalFailedException: If retrieval fails
+            SessionRetrievalError: If retrieval fails
         """
         try:
             # Aggregation pipeline to lookup user by cookie_id and get all sessions
@@ -667,9 +667,9 @@ class Session(Document):
             return [cls.model_validate(session) for session in sessions]
             
         except Exception as e:
-            raise SessionRetrievalFailedException(
-                message="Failed to retrieve all sessions for user by cookie",
-                note=f"cookie_id={cookie_id}, error={str(e)}"
+            raise SessionRetrievalError(
+                "Failed to retrieve all sessions for user by cookie",
+                details=f"cookie_id={cookie_id}, error={str(e)}"
             )
     
     @classmethod
@@ -685,7 +685,7 @@ class Session(Document):
             Total count of sessions for the user
             
         Raises:
-            SessionRetrievalFailedException: If retrieval fails
+            SessionRetrievalError: If retrieval fails
         """
         try:
             # Aggregation pipeline to lookup user by cookie_id and count sessions
@@ -717,9 +717,9 @@ class Session(Document):
             return result[0]["total"] if result else 0
             
         except Exception as e:
-            raise SessionRetrievalFailedException(
-                message="Failed to count sessions for user by cookie",
-                note=f"cookie_id={cookie_id}, error={str(e)}"
+            raise SessionRetrievalError(
+                "Failed to count sessions for user by cookie",
+                details=f"cookie_id={cookie_id}, error={str(e)}"
             )
     
     @classmethod
@@ -735,7 +735,7 @@ class Session(Document):
             List of starred Session documents sorted by most recently updated first
             
         Raises:
-            SessionRetrievalFailedException: If retrieval fails
+            SessionRetrievalError: If retrieval fails
         """
         try:
             # Aggregation pipeline to lookup user by cookie_id and get starred sessions
@@ -768,9 +768,9 @@ class Session(Document):
             return [cls.model_validate(session) for session in sessions]
             
         except Exception as e:
-            raise SessionRetrievalFailedException(
-                message="Failed to retrieve starred sessions for user by cookie",
-                note=f"cookie_id={cookie_id}, error={str(e)}"
+            raise SessionRetrievalError(
+                "Failed to retrieve starred sessions for user by cookie",
+                details=f"cookie_id={cookie_id}, error={str(e)}"
             )
 
         

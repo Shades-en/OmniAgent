@@ -1,7 +1,10 @@
-from omniagent.schemas.user import User, UserType
-from omniagent.schemas.session import Session
-from omniagent.schemas.summary import Summary
-from omniagent.schemas.message import Message, Feedback
+"""
+Schema module for OmniAgent.
+
+Re-exports MongoDB schemas for backward compatibility.
+"""
+
+from omniagent.schemas.mongo import User, UserType, Session, Summary, Message, Feedback
 
 __all__ = [
     "User",

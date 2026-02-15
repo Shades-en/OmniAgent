@@ -8,22 +8,17 @@ from pymongo import IndexModel
 
 from datetime import datetime, timezone
 from pydantic import Field
-from enum import Enum
 
 from opentelemetry.trace import SpanKind
 
-from omniagent.exceptions.db_exceptions import (
-    UserRetrievalFailedException,
-    UserDeletionFailedException
+from omniagent.exceptions import (
+    UserRetrievalError,
+    UserDeletionError,
 )
 from omniagent.utils.tracing import trace_operation, CustomSpanKinds
-from omniagent.schemas.message import Message
-from omniagent.schemas.summary import Summary
-
-
-class UserType(Enum):
-    GUEST = "guest"
-    USER = "logged_in"
+from omniagent.schemas.mongo.message import Message
+from omniagent.schemas.mongo.summary import Summary
+from omniagent.types.user import UserType
 
 
 class User(Document):
@@ -46,9 +41,9 @@ class User(Document):
         try:
             return await cls.get(ObjectId(user_id))
         except Exception as e:
-            raise UserRetrievalFailedException(
-                message="Failed to retrieve user by ID",
-                note=f"user_id={user_id}, error={str(e)}"
+            raise UserRetrievalError(
+                "Failed to retrieve user by ID",
+                details=f"user_id={user_id}, error={str(e)}"
             )
     
     @classmethod
@@ -57,9 +52,9 @@ class User(Document):
         try:
             return await cls.find_one(cls.cookie_id == cookie_id)
         except Exception as e:
-            raise UserRetrievalFailedException(
-                message="Failed to retrieve user by cookie ID",
-                note=f"cookie_id={cookie_id}, error={str(e)}"
+            raise UserRetrievalError(
+                "Failed to retrieve user by cookie ID",
+                details=f"cookie_id={cookie_id}, error={str(e)}"
             )
     
     @classmethod
@@ -144,9 +139,9 @@ class User(Document):
             return await cls._delete_user_with_sessions(user, cascade)
             
         except Exception as e:
-            raise UserDeletionFailedException(
-                message="Failed to delete user by cookie ID",
-                note=f"cookie_id={cookie_id}, cascade={cascade}, error={str(e)}"
+            raise UserDeletionError(
+                "Failed to delete user by cookie ID",
+                details=f"cookie_id={cookie_id}, cascade={cascade}, error={str(e)}"
             )
     
     @classmethod
@@ -187,9 +182,9 @@ class User(Document):
             return await cls._delete_user_with_sessions(user, cascade)
             
         except Exception as e:
-            raise UserDeletionFailedException(
-                message="Failed to delete user by ID",
-                note=f"user_id={user_id}, cascade={cascade}, error={str(e)}"
+            raise UserDeletionError(
+                "Failed to delete user by ID",
+                details=f"user_id={user_id}, cascade={cascade}, error={str(e)}"
             )
     
     @classmethod
@@ -208,7 +203,7 @@ class User(Document):
         Traced as INTERNAL span for database transaction with cascade delete.
         """
         from omniagent.db import MongoDB
-        from omniagent.schemas.session import Session
+        from omniagent.schemas.mongo.session import Session
 
         client = MongoDB.get_client()
         
@@ -245,7 +240,7 @@ class User(Document):
                     }
                     
             except Exception as e:
-                raise UserDeletionFailedException(
-                    message="Failed to delete user with sessions",
-                    note=f"user_id={user.id}, cascade={cascade}, error={str(e)}"
+                raise UserDeletionError(
+                    "Failed to delete user with sessions",
+                    details=f"user_id={user.id}, cascade={cascade}, error={str(e)}"
                 )

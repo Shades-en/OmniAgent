@@ -1,6 +1,10 @@
 from openinference.semconv.trace import SpanAttributes
+from openinference.instrumentation.openai import OpenAIInstrumentor
+from openinference.instrumentation.langchain import LangChainInstrumentor
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
+from opentelemetry.instrumentation.pymongo import PymongoInstrumentor
+from opentelemetry.instrumentation.redis import RedisInstrumentor
 
 from functools import wraps
 from contextvars import ContextVar
@@ -18,6 +22,46 @@ from beanie import PydanticObjectId
 from bson import ObjectId
 
 logger = logging.getLogger(__name__)
+
+# ============================================================================
+# Library Instrumentation
+# ============================================================================
+
+_is_instrumented = False
+
+
+def instrument(tracer_provider: Any) -> bool:
+    """
+    Instrument supported libraries with the provided tracer provider.
+    
+    Instruments: OpenAI, Pymongo, Redis, LangChain.
+    
+    Args:
+        tracer_provider: The OpenTelemetry tracer provider to use for instrumentation.
+    
+    Returns:
+        True if instrumentation was successful, False if already instrumented.
+    """
+    global _is_instrumented
+    
+    if _is_instrumented:
+        return False
+    
+    if tracer_provider is None:
+        return False
+    
+    OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+    PymongoInstrumentor().instrument(tracer_provider=tracer_provider)
+    RedisInstrumentor().instrument(tracer_provider=tracer_provider)
+    LangChainInstrumentor().instrument(tracer_provider=tracer_provider)
+    
+    _is_instrumented = True
+    return True
+
+
+def is_instrumented() -> bool:
+    """Return True if instrumentation has been applied."""
+    return _is_instrumented
 
 # ============================================================================
 # Context Variables for Request-Scoped Tracing
@@ -646,6 +690,9 @@ class CustomSpanKinds(Enum):
 
 
 __all__ = [
+    # Library instrumentation
+    "instrument",           # Instrument libraries with tracer provider
+    "is_instrumented",      # Check if instrumentation is applied
     # Context management
     "trace_context",        # Context manager (recommended)
     "set_trace_context",    # Manual set (if needed)

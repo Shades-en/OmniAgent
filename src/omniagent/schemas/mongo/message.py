@@ -11,17 +11,17 @@ from datetime import datetime, timezone
 from opentelemetry.trace import SpanKind
 
 from omniagent.utils.tracing import trace_operation, CustomSpanKinds
-from omniagent.exceptions.db_exceptions import (
-    MessageRetrievalFailedException,
-    MessageDeletionFailedException,
-    MessageUpdateFailedException
+from omniagent.exceptions import (
+    MessageRetrievalError,
+    MessageDeletionError,
+    MessageUpdateError,
 )
 from omniagent.config import DEFAULT_MESSAGE_PAGE_SIZE, MAX_TURNS_TO_FETCH
 from omniagent.types.message import Role, MessageAITextPart, MessageReasoningPart, MessageToolPart, MessageHumanTextPart, Feedback, MessageDTO
 
 if TYPE_CHECKING:
-    from omniagent.schemas.session import Session
-    from omniagent.schemas.summary import Summary
+    from omniagent.schemas.mongo.session import Session
+    from omniagent.schemas.mongo.summary import Summary
 
 class Message(Document):
     role: Role
@@ -118,7 +118,7 @@ class Message(Document):
             List of Message documents in chronological order
             
         Raises:
-            MessageRetrievalFailedException: If retrieval fails
+            MessageRetrievalError: If retrieval fails
         """
         try:
             skip = (page - 1) * page_size
@@ -138,9 +138,9 @@ class Message(Document):
             
             return messages
         except Exception as e:
-            raise MessageRetrievalFailedException(
-                message="Failed to retrieve paginated messages for session",
-                note=f"session_id={session_id}, page={page}, page_size={page_size}, error={str(e)}"
+            raise MessageRetrievalError(
+                "Failed to retrieve paginated messages for session",
+                details=f"session_id={session_id}, page={page}, page_size={page_size}, error={str(e)}"
             )
     
     @classmethod
@@ -155,7 +155,7 @@ class Message(Document):
             Total count of messages for the session
             
         Raises:
-            MessageRetrievalFailedException: If retrieval fails
+            MessageRetrievalError: If retrieval fails
         """
         try:
             count = await cls.find(
@@ -164,9 +164,9 @@ class Message(Document):
             
             return count
         except Exception as e:
-            raise MessageRetrievalFailedException(
-                message="Failed to count messages for session",
-                note=f"session_id={session_id}, error={str(e)}"
+            raise MessageRetrievalError(
+                "Failed to count messages for session",
+                details=f"session_id={session_id}, error={str(e)}"
             )
     
     @classmethod
@@ -181,7 +181,7 @@ class Message(Document):
             List of all Message documents in chronological order
             
         Raises:
-            MessageRetrievalFailedException: If retrieval fails
+            MessageRetrievalError: If retrieval fails
         """
         try:
             # Use cls.session._id for querying Link fields
@@ -194,9 +194,9 @@ class Message(Document):
             
             return messages
         except Exception as e:
-            raise MessageRetrievalFailedException(
-                message="Failed to retrieve all messages for session",
-                note=f"session_id={session_id}, error={str(e)}"
+            raise MessageRetrievalError(
+                "Failed to retrieve all messages for session",
+                details=f"session_id={session_id}, error={str(e)}"
             )
     
     @classmethod
@@ -221,7 +221,7 @@ class Message(Document):
             List of Message documents from the latest turns in chronological order (oldest to newest).
             
         Raises:
-            MessageRetrievalFailedException: If retrieval fails or validation fails
+            MessageRetrievalError: If retrieval fails or validation fails
         """
         if not session_id:
             return []
@@ -244,12 +244,12 @@ class Message(Document):
             ).to_list()
             
             return messages
-        except MessageRetrievalFailedException:
+        except MessageRetrievalError:
             raise
         except Exception as e:
-            raise MessageRetrievalFailedException(
-                message="Failed to retrieve latest messages for session",
-                note=f"session_id={session_id}, max_turns={max_turns}, current_turn_number={current_turn_number}, error={str(e)}"
+            raise MessageRetrievalError(
+                "Failed to retrieve latest messages for session",
+                details=f"session_id={session_id}, max_turns={max_turns}, current_turn_number={current_turn_number}, error={str(e)}"
             )
     
     @classmethod
@@ -266,7 +266,7 @@ class Message(Document):
             Message if found and belongs to user's session, None otherwise
             
         Raises:
-            MessageRetrievalFailedException: If retrieval fails
+            MessageRetrievalError: If retrieval fails
         """
         try:
             user_obj_id = ObjectId(user_id)
@@ -301,9 +301,9 @@ class Message(Document):
                 return None
             return cls.model_validate(results[0])
         except Exception as e:
-            raise MessageRetrievalFailedException(
-                message="Failed to retrieve message by client ID",
-                note=f"client_message_id={client_message_id}, user_id={user_id}, error={str(e)}"
+            raise MessageRetrievalError(
+                "Failed to retrieve message by client ID",
+                details=f"client_message_id={client_message_id}, user_id={user_id}, error={str(e)}"
             )
     
     @classmethod
@@ -325,7 +325,7 @@ class Message(Document):
             }
             
         Raises:
-            MessageUpdateFailedException: If update fails
+            MessageUpdateError: If update fails
         
         Traced as INTERNAL span for database operation.
         """
@@ -333,9 +333,9 @@ class Message(Document):
             message = await cls.get_by_client_id(client_message_id, user_id)
             
             if not message:
-                raise MessageUpdateFailedException(
-                    message="Message not found",
-                    note=f"client_message_id={client_message_id}"
+                raise MessageUpdateError(
+                    "Message not found",
+                    details=f"client_message_id={client_message_id}"
                 )
             
             message.feedback = feedback
@@ -347,12 +347,12 @@ class Message(Document):
                 "feedback": feedback.value if feedback else None
             }
                     
-        except MessageUpdateFailedException:
+        except MessageUpdateError:
             raise
         except Exception as e:
-            raise MessageUpdateFailedException(
-                message="Failed to update message feedback",
-                note=f"client_message_id={client_message_id}, feedback={feedback}, error={str(e)}"
+            raise MessageUpdateError(
+                "Failed to update message feedback",
+                details=f"client_message_id={client_message_id}, feedback={feedback}, error={str(e)}"
             )
     
     @classmethod
@@ -372,7 +372,7 @@ class Message(Document):
             }
             
         Raises:
-            MessageDeletionFailedException: If deletion fails
+            MessageDeletionError: If deletion fails
         
         Traced as INTERNAL span for database operation.
         """
@@ -396,7 +396,7 @@ class Message(Document):
             }
                     
         except Exception as e:
-            raise MessageDeletionFailedException(
-                message="Failed to delete message by client ID",
-                note=f"client_message_id={client_message_id}, error={str(e)}"
+            raise MessageDeletionError(
+                "Failed to delete message by client ID",
+                details=f"client_message_id={client_message_id}, error={str(e)}"
             ) 

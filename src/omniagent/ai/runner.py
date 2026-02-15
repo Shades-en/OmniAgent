@@ -7,15 +7,15 @@ from omniagent.ai.agents.agent import Agent
 from omniagent.ai.providers import get_llm_provider
 from omniagent.ai.providers.llm_provider import StreamCallback
 from omniagent.api.dto.chat import ChatRequestOptions, MessageQuery
-from omniagent.exceptions.db_exceptions import (
-    SessionNotFoundException,
-    UserNotFoundException,
-    MessageRetrievalFailedException,
+from omniagent.exceptions import (
+    SessionNotFoundError,
+    UserNotFoundError,
+    MessageRetrievalError,
+    MaxStepsReachedError,
 )
 from omniagent.types.message import MessageDTO
 from omniagent.schemas import Summary
-from omniagent.session_manager import SessionManager
-from omniagent.exceptions.agent_exceptions import MaxStepsReachedException
+from omniagent.session import SessionManager
 from omniagent.utils.tracing import trace_method
 from omniagent.utils.general import generate_id
 from omniagent.config import AISDK_ID_LENGTH
@@ -178,9 +178,9 @@ class Runner:
                 if not turn_completed:
                     self.session_manager.update_state(step=self.session_manager.state.step+1)
                     if self.session_manager.state.step > config.MAX_STEPS:
-                        raise MaxStepsReachedException(
-                            message="Agent exceeded maximum number of steps allowed",
-                            note="The agent made too many tool calls in a single turn. Consider simplifying the task or increasing MAX_STEPS.",
+                        raise MaxStepsReachedError(
+                            "Agent exceeded maximum number of steps allowed",
+                            details="The agent made too many tool calls in a single turn. Consider simplifying the task or increasing MAX_STEPS.",
                             current_step=self.session_manager.state.step,
                             max_steps=config.MAX_STEPS
                         )
@@ -210,7 +210,7 @@ class Runner:
                 fallback=False,
                 regenerated_summary=False
             )
-        except (SessionNotFoundException, UserNotFoundException, MessageRetrievalFailedException) as e:
+        except (SessionNotFoundError, UserNotFoundError, MessageRetrievalError) as e:
             raise e
         except Exception as e:
             logger.error(f"Error in _handle_query: {e}")

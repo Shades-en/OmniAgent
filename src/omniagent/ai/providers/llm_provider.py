@@ -3,7 +3,7 @@ from typing import List, Dict, Callable, Awaitable, Any
 import inspect
 
 from omniagent import config
-from omniagent.schemas.summary import Summary
+from omniagent.schemas.mongo.summary import Summary
 from omniagent.types.message import MessageDTO
 from omniagent.ai.tools.tools import Tool
 from omniagent.config import BASE_MODEL, AISDK_ID_LENGTH

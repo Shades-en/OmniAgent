@@ -1,24 +1,58 @@
+"""
+Base SessionManager abstract class for OmniAgent.
+"""
+
 import asyncio
+from abc import ABC, abstractmethod
 from typing import List, Tuple
 
 import logging
 
 from omniagent.types.state import State
 from omniagent.types.message import MessageDTO
-from omniagent.schemas import User, Session, Message, Summary
-from omniagent.config import MAX_TURNS_TO_FETCH, MAX_TOKEN_THRESHOLD
-from omniagent.exceptions.db_exceptions import (
-    SessionNotFoundException,
-    UserNotFoundException,
-)
+from omniagent.protocols import UserProtocol, SessionProtocol, MessageProtocol, SummaryProtocol
+from omniagent.config import MAX_TOKEN_THRESHOLD
 from omniagent.utils.general import generate_id
 from omniagent.config import AISDK_ID_LENGTH
-from omniagent.utils.tracing import trace_method, track_state_change, CustomSpanKinds
-from omniagent.ai.providers.utils import StreamCallback, stream_fallback_response
+from omniagent.utils.tracing import track_state_change
+from omniagent.ai.providers.utils import StreamCallback
 
 logger = logging.getLogger(__name__)
 
-class SessionManager():
+
+class SessionManager(ABC):
+    """
+    Abstract base class for session management.
+    
+    Provides common logic for state management and context orchestration.
+    Subclasses must implement database-specific methods for fetching and persisting data.
+    """
+    
+    @classmethod
+    @abstractmethod
+    async def initialize(cls, **kwargs) -> None:
+        """
+        Initialize the database connection and schemas.
+        
+        This should be called once during application startup (e.g., FastAPI lifespan).
+        Subclasses must implement this to set up their specific database backend.
+        
+        Args:
+            **kwargs: Database-specific configuration options
+        """
+        ...
+
+    @classmethod
+    @abstractmethod
+    async def shutdown(cls) -> None:
+        """
+        Close the database connection gracefully.
+        
+        This should be called during application shutdown (e.g., FastAPI lifespan).
+        Subclasses must implement this to clean up their specific database backend.
+        """
+        ...
+
     def __init__(
         self, 
         user_id: str | None, 
@@ -36,8 +70,8 @@ class SessionManager():
         self.user_id = user_id
         self.session_id = session_id
         self.user_cookie = user_cookie
-        self.user: User | None = None
-        self.session: Session | None = None
+        self.user: UserProtocol | None = None
+        self.session: SessionProtocol | None = None
 
     def _inititialise_state(
         self, 
@@ -51,7 +85,8 @@ class SessionManager():
             user_defined_state=state
         )
         return state
-    
+
+    @abstractmethod
     async def _fetch_user_or_session(self) -> None:
         """
         Fetch user or session based on new_user and new_chat flags.
@@ -60,41 +95,12 @@ class SessionManager():
         - new_user=False, new_chat=False -> Fetch session only
         - new_user=True -> Do nothing (new user, no data to fetch)
         
+        Must be implemented by subclasses for specific database backends.
         """
-        if self.state.new_user:
-            # New user - nothing to fetch
-            return
-        
-        if self.state.new_chat:
-            # Existing user, new chat - fetch user only
-            self.user = await User.get_by_id_or_cookie(self.user_id, self.user_cookie)
-            if not self.user:
-                raise UserNotFoundException(
-                    message="User not found for provided identifiers",
-                    note=f"user_id={self.user_id}, user_cookie={self.user_cookie}"
-                )
-        else:
-            # Existing user, existing chat - fetch session only
-            if self.session_id:
-                if self.user_id:
-                    # Primary: use user_id for direct query
-                    self.session = await Session.get_by_id(self.session_id, self.user_id)
-                elif self.user_cookie:
-                    # Fallback: use cookie_id with aggregation lookup
-                    self.session = await Session.get_by_id_and_cookie(self.session_id, self.user_cookie)
-            if not self.session:
-                raise SessionNotFoundException(
-                    message=f"Session not found for session_id: {self.session_id}",
-                    note=f"session_id={self.session_id}, user_id={self.user_id}, user_cookie={self.user_cookie}"
-                )
+        ...
 
-    @trace_method(
-        kind=CustomSpanKinds.DATABASE.value,
-        graph_node_id="fetch_context",
-        capture_input=False,
-        capture_output=False
-    )
-    async def _fetch_context(self) -> Tuple[List[Message], Summary | None]:
+    @abstractmethod
+    async def _fetch_context(self) -> Tuple[List[MessageProtocol], SummaryProtocol | None]:
         """
         Fetch the latest N turns (as messages) and the latest summary in parallel.
         
@@ -102,20 +108,33 @@ class SessionManager():
             Tuple of (messages, summary) where messages is a list of Message objects
             from the latest turns and summary is the latest Summary or None.
         
-        Traced as DATABASE span for database fetch operations.
+        Must be implemented by subclasses for specific database backends.
         """
-        if self.state.new_chat or not self.session_id:
-            return [], None
+        ...
+
+    @abstractmethod
+    async def update_user_session(
+        self, 
+        messages: List[MessageDTO], 
+        summary: SummaryProtocol | None, 
+        regenerated_summary: bool,
+        on_stream_event: StreamCallback | None = None,
+    ) -> List[MessageDTO]:
+        """
+        Create/update user and session, then insert messages.
         
-        messages_task = Message.get_latest_by_session(
-            session_id=str(self.session_id),
-            current_turn_number=self.state.turn_number,
-            max_turns=MAX_TURNS_TO_FETCH,
-        )
-        summary_task = Summary.get_latest_by_session(session_id=str(self.session_id))
+        Must be implemented by subclasses for specific database backends.
+        """
+        ...
+
+    @abstractmethod
+    def _convert_messages_to_dtos(self, messages: List[MessageProtocol]) -> List[MessageDTO]:
+        """
+        Convert database message objects to MessageDTOs.
         
-        messages, summary = await asyncio.gather(messages_task, summary_task)
-        return messages, summary
+        Must be implemented by subclasses for specific database backends.
+        """
+        ...
 
     def update_state(self, **kwargs) -> None:
         """
@@ -135,13 +154,7 @@ class SessionManager():
                 track_state_change(key, old_value, value)
 
 
-    @trace_method(
-        kind=CustomSpanKinds.DATABASE.value,
-        graph_node_id="session_context_loader",
-        capture_input=False,
-        capture_output=False
-    )
-    async def get_context_and_update_state(self) -> Tuple[List[MessageDTO], Summary | None]:
+    async def get_context_and_update_state(self) -> Tuple[List[MessageDTO], SummaryProtocol | None]:
         """
         Fetch context (messages + summary) and user/session in parallel, then update state.
         
@@ -153,8 +166,6 @@ class SessionManager():
         
         Returns:
             Tuple of (messages, summary) - messages from selected turns in order of arrival.
-        
-        Traced as INTERNAL span for database/session operations.
         """
         # Fetch context and user/session in parallel
         context_task = self._fetch_context()
@@ -202,8 +213,8 @@ class SessionManager():
             active_summary=summary
         )
         
-        # Convert Message documents to MessageDTOs
-        message_dtos = Message.to_dtos(context_messages)
+        # Convert Message documents to MessageDTOs (implemented by subclass)
+        message_dtos = self._convert_messages_to_dtos(context_messages)
         
         return message_dtos, summary
     
@@ -227,66 +238,3 @@ class SessionManager():
         
         # Return list with user message and error response
         return [user_query_dto, error_message_dto]
-
-    @trace_method(
-        kind=CustomSpanKinds.DATABASE.value,
-        graph_node_id="session_updater",
-        capture_input=False,
-        capture_output=False
-    )
-    async def update_user_session(
-        self, 
-        messages: List[MessageDTO], 
-        summary: Summary | None, 
-        regenerated_summary: bool,
-        on_stream_event: StreamCallback | None = None,
-    ) -> List[MessageDTO]:
-        # Case 1: New user and new session - create both atomically
-        if not self.session and not self.user:
-            self.session = await Session.create_with_user(
-                cookie_id=self.user_cookie,
-                session_id=self.session_id,
-            )
-        # Case 2: Existing user, new session - create session for existing user
-        elif not self.session and self.user:
-            self.session = await Session.create_for_existing_user(
-                user=self.user,
-                session_id=self.session_id,
-            )
-        
-        # Insert messages for the session
-        if self.session:
-            turn_number = self.state.turn_number
-            try:
-                if regenerated_summary:
-                    await Summary.create_with_session(
-                        session=self.session,
-                        summary=summary
-                    )
-                # Ensure writes happen sequentially to avoid Mongo write conflicts
-                await self.session.insert_messages(
-                    messages=messages,
-                    turn_number=turn_number,
-                    previous_summary=summary,
-                )
-                
-            except Exception as e:
-                logger.error(f"Failed to insert messages for session {self.session_id}: {str(e)}")
-                # If insertion fails, still save user message and error response
-                if not messages:
-                    return
-                
-                # Create fallback messages with error response
-                messages = self.create_fallback_messages(messages[0])
-                
-                # Stream the error response if callback is provided
-                if on_stream_event:
-                    await stream_fallback_response(on_stream_event, messages[-1])
-                
-                await self.session.insert_messages(
-                    messages=messages,
-                    turn_number=turn_number,
-                    previous_summary=summary,
-                )
-
-        return messages
