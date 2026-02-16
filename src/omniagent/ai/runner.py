@@ -6,7 +6,7 @@ from omniagent import config
 from omniagent.ai.agents.agent import Agent
 from omniagent.ai.providers import get_llm_provider
 from omniagent.ai.providers.llm_provider import StreamCallback
-from omniagent.api.dto.chat import ChatRequestOptions, MessageQuery
+from omniagent.types.chat import MessageQuery, RunnerOptions
 from omniagent.exceptions import (
     SessionNotFoundError,
     UserNotFoundError,
@@ -20,9 +20,12 @@ from omniagent.utils.tracing import trace_method
 from omniagent.utils.general import generate_id
 from omniagent.config import AISDK_ID_LENGTH
 from omniagent.ai.providers.utils import stream_fallback_response, dispatch_stream_event, create_finish_event
+from omniagent.utils.task_registry import register_task, unregister_task
+from omniagent.utils.streaming import format_sse_event, format_sse_done
+from omniagent.constants import STREAM_EVENT_DATA_SESSION, STREAM_EVENT_ERROR
 
 import asyncio
-from typing import List
+from typing import List, AsyncGenerator, Tuple
 from dataclasses import dataclass
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -39,11 +42,11 @@ class QueryResult:
     regenerated_summary: bool
 
 class Runner:
-    def __init__(self, agent: Agent, session_manager: SessionManager, options: ChatRequestOptions | None = None) -> None:
+    def __init__(self, agent: Agent, session_manager: SessionManager, options: RunnerOptions | None = None) -> None:
         self.agent = agent
         self.session_manager = session_manager
         self.skip_cache = config.SKIP_CACHE
-        self.options = options or ChatRequestOptions()
+        self.options = options or RunnerOptions()
         self.llm_provider = get_llm_provider(
             provider_name=config.LLM_PROVIDER,
             api_type=self.options.api_type,
@@ -96,8 +99,8 @@ class Runner:
                 ),
             )
         
-        # Use real LLM methods
-        stream_enabled = on_stream_event is not None
+        # Use real LLM methods - stream only if options.stream is True AND callback provided
+        stream_enabled = self.options.stream and on_stream_event is not None
         return await asyncio.gather(
             self.llm_provider.generate_response(
                 conversation_history=conversation_history,
@@ -240,33 +243,101 @@ class Runner:
     async def run(
         self,
         query_message: MessageQuery,
-        skip_cache = config.SKIP_CACHE,
         on_stream_event: StreamCallback | None = None,
     ) -> dict:
-        result: QueryResult = await self._handle_query(query_message, skip_cache, on_stream_event)
-        # Shield update_user_session from task cancellation to ensure DB writes complete
-        messages = await asyncio.shield(self.session_manager.update_user_session(
-            messages=result.messages,
-            summary=result.summary,
-            regenerated_summary=result.regenerated_summary,
-            on_stream_event=on_stream_event,
-        ))
+        session_id = self.session_manager.session_id
         
-        # Send finish event after DB writes complete
-        await dispatch_stream_event(on_stream_event, create_finish_event("stop"))
+        # Register task for cancellation when streaming is enabled
+        if self.options.stream and session_id:
+            current_task = asyncio.current_task()
+            if current_task:
+                register_task(session_id, current_task)
         
-        return {
-            "messages": [
-                msg.model_dump(mode='json', exclude={"session", "previous_summary"})
-                for msg in messages
-            ],
-            "summary": (
-                result.summary.model_dump(mode='json', exclude={"session"})
-                if result.summary
-                else None
-            ),
-            "session_id": str(self.session_manager.session.id)
-        }
+        try:
+            result: QueryResult = await self._handle_query(query_message, on_stream_event)
+            # Shield update_user_session from task cancellation to ensure DB writes complete
+            messages = await asyncio.shield(self.session_manager.update_user_session(
+                messages=result.messages,
+                summary=result.summary,
+                regenerated_summary=result.regenerated_summary,
+                on_stream_event=on_stream_event,
+            ))
+            
+            # Send finish event after DB writes complete
+            await dispatch_stream_event(on_stream_event, create_finish_event("stop"))
+            
+            return {
+                "messages": [
+                    msg.model_dump(mode='json', exclude={"session", "previous_summary"})
+                    for msg in messages
+                ],
+                "summary": (
+                    result.summary.model_dump(mode='json', exclude={"session"})
+                    if result.summary
+                    else None
+                ),
+                "session_id": str(self.session_manager.session.id)
+            }
+        finally:
+            # Unregister task when done (success or failure)
+            if self.options.stream and session_id:
+                unregister_task(session_id)
+
+    async def run_stream(
+        self,
+        query_message: MessageQuery,
+    ) -> Tuple[AsyncGenerator[str, None], asyncio.Future]:
+        """
+        Run the agent with streaming, returning a generator and result future.
+        
+        This method provides a cleaner streaming API where:
+        - The generator yields formatted SSE events (including DONE sentinel)
+        - The result dict is available via the future after stream completes
+        
+        Args:
+            query_message: The user's query message
+            
+        Returns:
+            Tuple of (event_generator, result_future):
+            - event_generator: AsyncGenerator yielding formatted SSE strings
+            - result_future: Future that resolves to the result dict after completion
+        """
+        queue: asyncio.Queue = asyncio.Queue()
+        result_future: asyncio.Future = asyncio.get_event_loop().create_future()
+        
+        async def stream_callback(event):
+            await queue.put(event)
+        
+        async def run_chat():
+            try:
+                result = await self.run(
+                    query_message=query_message,
+                    on_stream_event=stream_callback,
+                )
+                # Send data-session event with result
+                await queue.put({"type": STREAM_EVENT_DATA_SESSION, "data": result})
+                result_future.set_result(result)
+            except asyncio.CancelledError:
+                await queue.put({"type": "cancelled", "message": "Stream cancelled by user"})
+                result_future.set_exception(asyncio.CancelledError())
+            except Exception as exc:
+                await queue.put({"type": STREAM_EVENT_ERROR, "errorText": str(exc)})
+                result_future.set_exception(exc)
+            finally:
+                await queue.put(None)  # Signal end of stream
+        
+        # Start the chat task
+        asyncio.create_task(run_chat())
+        
+        async def event_generator() -> AsyncGenerator[str, None]:
+            while True:
+                event = await queue.get()
+                if event is None:
+                    break
+                yield format_sse_event(event)
+            yield format_sse_done()
+        
+        return event_generator(), result_future
 
 # File upload functionality
 # Implement proper error handling in python

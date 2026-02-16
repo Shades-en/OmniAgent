@@ -46,6 +46,12 @@ from omniagent.utils.tracing import (
     CustomSpanKinds,
 )
 
+from omniagent.utils.streaming import (
+    get_streaming_headers,
+    format_sse_event,
+    format_sse_done,
+)
+
 __all__ = [
     # General utilities
     "generate_id",
@@ -78,4 +84,8 @@ __all__ = [
     "track_state_change",
     # Tracing - Span kinds
     "CustomSpanKinds",
+    # Streaming utilities
+    "get_streaming_headers",
+    "format_sse_event",
+    "format_sse_done",
 ]
