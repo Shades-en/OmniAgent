@@ -6,10 +6,6 @@ import re
 
 from omniagent.utils.general import get_token_count
 
-class Feedback(Enum):
-    LIKE = "liked"
-    DISLIKE = "disliked"
-
 class Role(Enum):
     HUMAN = 'user'
     SYSTEM = 'system'
@@ -102,7 +98,6 @@ class MessageDTO(BaseModel):
     metadata: dict = Field(default_factory=dict)
     parts: list[MessageHumanTextPart | MessageAITextPart | MessageReasoningPart | MessageToolPart] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    feedback: Feedback | None = None
 
     @classmethod
     def create_system_message(cls, text: str, message_id: str, metadata: dict = None) -> Self:
@@ -210,5 +205,4 @@ class MessageDTO(BaseModel):
         
         return self
         
-
 

@@ -4,7 +4,7 @@ Schema module for OmniAgent.
 Re-exports MongoDB schemas for backward compatibility.
 """
 
-from omniagent.schemas.mongo import User, UserType, Session, Summary, Message, Feedback
+from omniagent.schemas.mongo import User, UserType, Session, Summary, Message
 
 __all__ = [
     "User",
@@ -12,5 +12,4 @@ __all__ = [
     "Session",
     "Summary",
     "Message",
-    "Feedback",
 ]

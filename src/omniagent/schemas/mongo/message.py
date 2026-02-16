@@ -14,16 +14,18 @@ from omniagent.utils.tracing import trace_operation, CustomSpanKinds
 from omniagent.exceptions import (
     MessageRetrievalError,
     MessageDeletionError,
-    MessageUpdateError,
 )
 from omniagent.config import DEFAULT_MESSAGE_PAGE_SIZE, MAX_TURNS_TO_FETCH
-from omniagent.types.message import Role, MessageAITextPart, MessageReasoningPart, MessageToolPart, MessageHumanTextPart, Feedback, MessageDTO
+from omniagent.types.message import Role, MessageAITextPart, MessageReasoningPart, MessageToolPart, MessageHumanTextPart, MessageDTO
+from omniagent.schemas.mongo.public_dict import PublicDictMixin
 
 if TYPE_CHECKING:
     from omniagent.schemas.mongo.session import Session
     from omniagent.schemas.mongo.summary import Summary
 
-class Message(Document):
+class Message(PublicDictMixin, Document):
+    PUBLIC_EXCLUDE = {"id", "session", "previous_summary", "client_message_id"}
+
     role: Role
     metadata: dict = Field(default_factory=dict)
     parts: list[MessageHumanTextPart | MessageAITextPart | MessageReasoningPart | MessageToolPart] = Field(default_factory=list)
@@ -31,7 +33,6 @@ class Message(Document):
     previous_summary: Link[Summary] | None = None
     turn_number: int = 1
     session: Link[Session]
-    feedback: Feedback | None = None
     client_message_id: str | None = Field(default=None, description="Frontend-generated message ID (e.g., from AI SDK)")
 
     class Settings:
@@ -68,6 +69,11 @@ class Message(Document):
                 # For MessageToolPart which has separate input/output counts
                 total += part.input_token_count + part.output_token_count
         return total
+
+    def to_public_dict(self, *, exclude: set[str] | None = None) -> dict:
+        data = super().to_public_dict(exclude=exclude)
+        data["id"] = self.client_message_id
+        return data
     
     def to_dto(self) -> MessageDTO:
         """
@@ -82,7 +88,6 @@ class Message(Document):
             parts=self.parts,
             metadata=self.metadata,
             created_at=self.created_at,
-            feedback=self.feedback,
         )
     
     @classmethod
@@ -304,55 +309,6 @@ class Message(Document):
             raise MessageRetrievalError(
                 "Failed to retrieve message by client ID",
                 details=f"client_message_id={client_message_id}, user_id={user_id}, error={str(e)}"
-            )
-    
-    @classmethod
-    @trace_operation(kind=SpanKind.INTERNAL, open_inference_kind=CustomSpanKinds.DATABASE.value)
-    async def update_feedback(cls, client_message_id: str, feedback: Feedback | None, user_id: str) -> dict:
-        """
-        Update the feedback for a message.
-        
-        Args:
-            client_message_id: The frontend-generated message ID (from AI SDK)
-            feedback: The feedback value (LIKE, DISLIKE, or None for neutral/removal)
-            user_id: The user's MongoDB document ID for authorization
-            
-        Returns:
-            Dictionary with update info: {
-                "message_updated": bool,
-                "message_id": str,
-                "feedback": str | None
-            }
-            
-        Raises:
-            MessageUpdateError: If update fails
-        
-        Traced as INTERNAL span for database operation.
-        """
-        try:
-            message = await cls.get_by_client_id(client_message_id, user_id)
-            
-            if not message:
-                raise MessageUpdateError(
-                    "Message not found",
-                    details=f"client_message_id={client_message_id}"
-                )
-            
-            message.feedback = feedback
-            await message.save()
-            
-            return {
-                "message_updated": True,
-                "message_id": client_message_id,
-                "feedback": feedback.value if feedback else None
-            }
-                    
-        except MessageUpdateError:
-            raise
-        except Exception as e:
-            raise MessageUpdateError(
-                "Failed to update message feedback",
-                details=f"client_message_id={client_message_id}, feedback={feedback}, error={str(e)}"
             )
     
     @classmethod

@@ -16,12 +16,12 @@ from omniagent.exceptions import (
     UserDeletionError,
 )
 from omniagent.utils.tracing import trace_operation, CustomSpanKinds
-from omniagent.schemas.mongo.message import Message
-from omniagent.schemas.mongo.summary import Summary
 from omniagent.types.user import UserType
+from omniagent.db.document_models import get_message_model, get_summary_model
+from omniagent.schemas.mongo.public_dict import PublicDictMixin
 
 
-class User(Document):
+class User(PublicDictMixin, Document):
     cookie_id: str = Field(..., min_length=1)
     category: UserType = UserType.GUEST
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -211,11 +211,13 @@ class User(Document):
             try:
                 async with await session_txn.start_transaction():
                     if cascade:
+                        MessageModel = get_message_model()
+                        SummaryModel = get_summary_model()
                         # Delete user, sessions, and their related data in parallel
                         delete_results = await asyncio.gather(
                             user.delete(session=session_txn),
-                            Message.find({"session.user.$id": user.id}).delete(session=session_txn),
-                            Summary.find({"session.user.$id": user.id}).delete(session=session_txn),
+                            MessageModel.find({"session.user.$id": user.id}).delete(session=session_txn),
+                            SummaryModel.find({"session.user.$id": user.id}).delete(session=session_txn),
                             Session.find(Session.user.id == user.id).delete(session=session_txn)
                         )
                         

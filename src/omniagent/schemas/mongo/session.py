@@ -26,9 +26,13 @@ from omniagent.exceptions import (
 )
 from omniagent.config import DEFAULT_SESSION_NAME, DEFAULT_SESSION_PAGE_SIZE
 from omniagent.utils.tracing import trace_method, trace_operation, CustomSpanKinds
+from omniagent.db.document_models import get_message_model, get_summary_model
+from omniagent.schemas.mongo.public_dict import PublicDictMixin
 
 
-class Session(Document):
+class Session(PublicDictMixin, Document):
+    PUBLIC_EXCLUDE = {"user"}
+
     name: str = Field(default_factory=lambda: DEFAULT_SESSION_NAME)
     latest_turn_number: int = Field(...)
     user: Link[User]
@@ -372,11 +376,11 @@ class Session(Document):
         
         Traced as INTERNAL span for database transaction with cascade delete.
         """
-        from omniagent.schemas.mongo.message import Message
-        from omniagent.schemas.mongo.summary import Summary
         from omniagent.db import MongoDB
         
         try:
+            MessageModel = get_message_model()
+            SummaryModel = get_summary_model()
             obj_id = ObjectId(user_id)
             
             # Check if user has any sessions
@@ -395,8 +399,8 @@ class Session(Document):
                     # Delete all sessions, messages, and summaries in parallel
                     delete_results = await asyncio.gather(
                         cls.find(cls.user.id == obj_id).delete(session=session_txn),
-                        Message.find({"session.user.$id": obj_id}).delete(session=session_txn),
-                        Summary.find({"session.user.$id": obj_id}).delete(session=session_txn)
+                        MessageModel.find({"session.user.$id": obj_id}).delete(session=session_txn),
+                        SummaryModel.find({"session.user.$id": obj_id}).delete(session=session_txn)
                     )
                     
                     sessions_deleted = delete_results[0].deleted_count if delete_results[0] else 0
@@ -438,11 +442,11 @@ class Session(Document):
         
         Traced as INTERNAL span for database transaction with cascade delete.
         """
-        from omniagent.schemas.mongo.message import Message
-        from omniagent.schemas.mongo.summary import Summary
         from omniagent.db import MongoDB
         
         try:
+            MessageModel = get_message_model()
+            SummaryModel = get_summary_model()
             session = await cls.get_by_id(session_id, user_id)
             
             if not session:
@@ -460,8 +464,8 @@ class Session(Document):
                     # Delete session, messages, and summaries in parallel
                     delete_results = await asyncio.gather(
                         session.delete(session=session_txn),
-                        Message.find(Message.session._id == session_obj_id).delete(session=session_txn),
-                        Summary.find(Summary.session._id == session_obj_id).delete(session=session_txn)
+                        MessageModel.find(MessageModel.session._id == session_obj_id).delete(session=session_txn),
+                        SummaryModel.find(SummaryModel.session._id == session_obj_id).delete(session=session_txn)
                     )
                     
                     messages_deleted = delete_results[1].deleted_count if delete_results[1] else 0
@@ -520,12 +524,12 @@ class Session(Document):
             return []
         
         try:
-            from omniagent.schemas.mongo.message import Message
+            MessageModel = get_message_model()
 
             # Convert MessageDTOs to Message documents
             message_docs = []
             for msg_dto in messages:
-                message_doc = Message(
+                message_doc = MessageModel(
                     role=msg_dto.role.value,  # Extract string value from enum
                     parts=msg_dto.parts,
                     metadata=msg_dto.metadata,
@@ -544,7 +548,7 @@ class Session(Document):
                 client = MongoDB.get_client()
                 async with client.start_session() as session_txn:
                     async with await session_txn.start_transaction():
-                        await Message.insert_many(message_docs, session=session_txn)
+                        await MessageModel.insert_many(message_docs, session=session_txn)
                         await self._update_latest_turn_number(turn_number, session=session_txn)
             
             await _do_insert()

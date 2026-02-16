@@ -10,7 +10,9 @@ import logging
 from omniagent.session.base import SessionManager
 from omniagent.ai.providers import get_llm_provider
 from omniagent.types.message import MessageDTO
-from omniagent.schemas.mongo import User, Session, Message, Summary
+from omniagent.db.document_models import DocumentModels, get_message_model, get_summary_model
+from omniagent.schemas.mongo import User, Session, Summary
+from omniagent.protocols import MessageProtocol
 from omniagent.config import MAX_TURNS_TO_FETCH, LLM_PROVIDER
 from omniagent.exceptions import (
     SessionNotFoundError,
@@ -37,6 +39,8 @@ class MongoSessionManager(SessionManager):
         db_name: str | None = None,
         srv_uri: str | None = None,
         allow_index_dropping: bool = False,
+        models: DocumentModels | None = None,
+        extra_document_models=None,
     ) -> None:
         """
         Initialize MongoDB connection and register Beanie document models.
@@ -61,6 +65,8 @@ class MongoSessionManager(SessionManager):
             db_name=db_name,
             srv_uri=srv_uri,
             allow_index_dropping=allow_index_dropping,
+            models=models,
+            extra_document_models=extra_document_models,
         )
 
     @classmethod
@@ -107,16 +113,19 @@ class MongoSessionManager(SessionManager):
                 max_chat_name_words=max_chat_name_words,
             )
 
+        MessageModel = get_message_model()
+        SummaryModel = get_summary_model()
+
         chat_name_context_max_messages = 2 * turns_between_chat_name
-        summary_task = Summary.get_latest_by_session(session_id=session_id)
-        messages_task = Message.get_paginated_by_session(
+        summary_task = SummaryModel.get_latest_by_session(session_id=session_id)
+        messages_task = MessageModel.get_paginated_by_session(
             session_id=session_id,
             page=1,
             page_size=chat_name_context_max_messages,
         )
         summary, messages = await asyncio.gather(summary_task, messages_task)
 
-        conversation_to_summarize = Message.to_dtos(messages) if messages else None
+        conversation_to_summarize = MessageModel.to_dtos(messages) if messages else None
         return await llm_provider.generate_chat_name(
             query=query,
             previous_summary=summary,
@@ -172,7 +181,7 @@ class MongoSessionManager(SessionManager):
         capture_input=False,
         capture_output=False
     )
-    async def _fetch_context(self) -> Tuple[List[Message], Summary | None]:
+    async def _fetch_context(self) -> Tuple[List[MessageProtocol], Summary | None]:
         """
         Fetch the latest N turns (as messages) and the latest summary in parallel.
         
@@ -185,21 +194,25 @@ class MongoSessionManager(SessionManager):
         if self.state.new_chat or not self.session_id:
             return [], None
         
-        messages_task = Message.get_latest_by_session(
+        MessageModel = get_message_model()
+        SummaryModel = get_summary_model()
+
+        messages_task = MessageModel.get_latest_by_session(
             session_id=str(self.session_id),
             current_turn_number=self.state.turn_number,
             max_turns=MAX_TURNS_TO_FETCH,
         )
-        summary_task = Summary.get_latest_by_session(session_id=str(self.session_id))
+        summary_task = SummaryModel.get_latest_by_session(session_id=str(self.session_id))
         
         messages, summary = await asyncio.gather(messages_task, summary_task)
         return messages, summary
 
-    def _convert_messages_to_dtos(self, messages: List[Message]) -> List[MessageDTO]:
+    def _convert_messages_to_dtos(self, messages: List[MessageProtocol]) -> List[MessageDTO]:
         """
         Convert MongoDB Message documents to MessageDTOs.
         """
-        return Message.to_dtos(messages)
+        MessageModel = get_message_model()
+        return MessageModel.to_dtos(messages)
 
     @trace_method(
         kind=CustomSpanKinds.DATABASE.value,
@@ -235,7 +248,8 @@ class MongoSessionManager(SessionManager):
             turn_number = self.state.turn_number
             try:
                 if regenerated_summary:
-                    await Summary.create_with_session(
+                    SummaryModel = get_summary_model()
+                    await SummaryModel.create_with_session(
                         session=self.session,
                         summary=summary
                     )

@@ -1,7 +1,6 @@
 """Type definitions for OmniAgent."""
 
 from omniagent.types.message import (
-    Feedback,
     Role,
     ToolPartState,
     MessageHumanTextPart,
@@ -16,7 +15,6 @@ from omniagent.types.user import UserType
 
 __all__ = [
     # Message types
-    "Feedback",
     "Role",
     "ToolPartState",
     "MessageHumanTextPart",

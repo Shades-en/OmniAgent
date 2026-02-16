@@ -8,16 +8,12 @@ from beanie import init_beanie, Document
 from pymongo import AsyncMongoClient
 from opentelemetry.trace import SpanKind
 
+from omniagent.db.document_models import DocumentModels, set_document_models
 from omniagent.schemas.mongo import User, Session, Summary, Message
 from omniagent.utils.tracing import trace_operation, CustomSpanKinds
 
-# All document models to register with Beanie
-DOCUMENT_MODELS: List[Type[Document]] = [
-    User,
-    Session,
-    Summary,
-    Message,
-]
+# Default typed model mapping
+DEFAULT_MODELS = DocumentModels(user=User, session=Session, summary=Summary, message=Message)
 
 
 class MongoDB:
@@ -38,6 +34,8 @@ class MongoDB:
         db_name: str | None = None,
         srv_uri: str | None = None,
         allow_index_dropping: bool = False,
+        models: DocumentModels | None = None,
+        extra_document_models: List[Type[Document]] | None = None,
     ) -> None:
         """
         Initialize MongoDB connection and Beanie ODM.
@@ -72,26 +70,32 @@ class MongoDB:
                 connection_uri = f"mongodb://{host}:{port}"
         
         cls._client = AsyncMongoClient(connection_uri)
-        
+
+        resolved_models = models or DEFAULT_MODELS
+        document_models: List[Type[Document]] = [
+            resolved_models.user,
+            resolved_models.session,
+            resolved_models.summary,
+            resolved_models.message,
+        ] + (extra_document_models or [])
+
         await init_beanie(
             database=cls._client[db_name],
-            document_models=DOCUMENT_MODELS,
+            document_models=document_models,
             allow_index_dropping=allow_index_dropping,
         )
-        
-        # Rebuild models to resolve circular dependencies
-        # Message has Link[Session], Link[Summary]
-        # Session imports Message, Summary
-        # Pass the namespace so forward references can be resolved
-        Message.model_rebuild(_types_namespace={
-            'Session': Session,
-            'Summary': Summary
-        })
-        Session.model_rebuild(_types_namespace={
-            'Message': Message,
-            'Summary': Summary
-        })
-        Summary.model_rebuild(_types_namespace={'Session': Session})
+
+        set_document_models(
+            user=resolved_models.user,
+            session=resolved_models.session,
+            summary=resolved_models.summary,
+            message=resolved_models.message,
+        )
+
+        # Rebuild models to resolve circular dependencies using the registered models.
+        resolved_models.message.model_rebuild(_types_namespace={"Session": resolved_models.session, "Summary": resolved_models.summary})
+        resolved_models.session.model_rebuild(_types_namespace={"Message": resolved_models.message, "Summary": resolved_models.summary})
+        resolved_models.summary.model_rebuild(_types_namespace={"Session": resolved_models.session})
         
         cls._initialized = True
     

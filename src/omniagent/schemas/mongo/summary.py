@@ -20,8 +20,11 @@ from omniagent.exceptions import (
     SummaryCreationError,
 )
 from omniagent.utils.general import get_token_count
+from omniagent.schemas.mongo.public_dict import PublicDictMixin
 
-class Summary(Document):
+class Summary(PublicDictMixin, Document):
+    PUBLIC_EXCLUDE = {"session"}
+
     content: str
     token_count: int = Field(default=0)
     start_turn_number: int
