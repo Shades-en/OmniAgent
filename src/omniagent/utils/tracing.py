@@ -4,7 +4,6 @@ from openinference.instrumentation.langchain import LangChainInstrumentor
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from opentelemetry.instrumentation.pymongo import PymongoInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
 
 from functools import wraps
 from contextvars import ContextVar
@@ -52,7 +51,6 @@ def instrument(tracer_provider: Any) -> bool:
     
     OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
     PymongoInstrumentor().instrument(tracer_provider=tracer_provider)
-    RedisInstrumentor().instrument(tracer_provider=tracer_provider)
     LangChainInstrumentor().instrument(tracer_provider=tracer_provider)
     
     _is_instrumented = True
@@ -77,10 +75,7 @@ _graph_node_stack: ContextVar[list[str]] = ContextVar('graph_node_stack', defaul
 def set_trace_context(
     query: str | None = None,
     session_id: str | None = None,
-    user_id: str | None = None,
     user_client_id: str | None = None,
-    new_chat: bool = False,
-    new_user: bool = False,
 ) -> None:
     """
     Set tracing context for the current async execution context.
@@ -91,19 +86,13 @@ def set_trace_context(
     Args:
         query: User's input query/message
         session_id: MongoDB session ID
-        user_id: MongoDB user ID
         user_client_id: Consumer-provided user identifier (e.g., cookie, auth subject)
-        new_chat: Whether this is a new chat session
-        new_user: Whether this is a new user
     
     Example:
         >>> set_trace_context(
         ...     query="What's the weather like?",
         ...     session_id="507f1f77bcf86cd799439011",
-        ...     user_id="507f191e810c19729de860ea",
         ...     user_client_id="abc123",
-        ...     new_chat=False,
-        ...     new_user=False
         ... )
     
     Note:
@@ -113,10 +102,7 @@ def set_trace_context(
     _trace_context.set({
         "query": query,
         "session_id": session_id,
-        "user_id": user_id,
         "user_client_id": user_client_id,
-        "new_chat": new_chat,
-        "new_user": new_user,
     })
 
 
@@ -125,7 +111,7 @@ def get_trace_context() -> dict[str, Any]:
     Get the current tracing context for this async execution.
     
     Returns:
-        Dictionary containing query, session_id, user_id, user_client_id, turn_number, new_chat, new_user.
+        Dictionary containing query, session_id, user_client_id.
         Returns empty dict if no context has been set.
     
     Example:
@@ -152,10 +138,7 @@ def clear_trace_context() -> None:
 async def trace_context(
     query: str | None = None,
     session_id: str | None = None,
-    user_id: str | None = None,
     user_client_id: str | None = None,
-    new_chat: bool = False,
-    new_user: bool = False,
 ):
     """
     Context manager for tracing context lifecycle.
@@ -166,16 +149,12 @@ async def trace_context(
     Args:
         query: User's input query/message
         session_id: MongoDB session ID
-        user_id: MongoDB user ID
         user_client_id: Consumer-provided user identifier (e.g., cookie, auth subject)
-        new_chat: Whether this is a new chat session
-        new_user: Whether this is a new user
     
     Usage:
         >>> async with trace_context(
         ...     query="What's the weather?",
         ...     session_id="507f1f77bcf86cd799439011",
-        ...     user_id="507f191e810c19729de860ea",
         ... ):
         ...     # Context is set here
         ...     result = await runner.run(query)
@@ -193,10 +172,7 @@ async def trace_context(
     set_trace_context(
         query=query,
         session_id=session_id,
-        user_id=user_id,
         user_client_id=user_client_id,
-        new_chat=new_chat,
-        new_user=new_user
     )
     
     try:

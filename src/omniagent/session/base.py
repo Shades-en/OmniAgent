@@ -55,45 +55,33 @@ class SessionManager(ABC):
 
     def __init__(
         self, 
-        user_id: str | None, 
         session_id: str | None, 
         user_client_id: str,
-        new_chat: bool, 
-        new_user: bool,
         state: dict = {}, 
     ):
-        self.state = self._inititialise_state(
-            new_chat=new_chat,
-            new_user=new_user,
-            state=state
-        )
-        self.user_id = user_id
+        self.state = self._inititialise_state(state=state)
         self.session_id = session_id
         self.user_client_id = user_client_id
         self.user: UserProtocol | None = None
         self.session: SessionProtocol | None = None
+        self.new_chat: bool = False
+        self.new_user: bool = False
 
-    def _inititialise_state(
-        self, 
-        new_chat: bool, 
-        new_user: bool,
-        state: dict
-    ) -> State:
-        state = State(
-            new_chat=new_chat,
-            new_user=new_user,
-            user_defined_state=state
-        )
-        return state
+    def _inititialise_state(self, state: dict) -> State:
+        return State(user_defined_state=state)
 
     @abstractmethod
     async def _fetch_user_or_session(self) -> None:
         """
-        Fetch user or session based on new_user and new_chat flags.
+        Fetch user and session in parallel based on client_id and session_id.
         
-        - new_user=False, new_chat=True  -> Fetch user only
-        - new_user=False, new_chat=False -> Fetch session only
-        - new_user=True -> Do nothing (new user, no data to fetch)
+        Sets instance variables:
+        - self.new_user = True if user not found
+        - self.new_chat = True if session not found (or new user)
+        - self.user and self.session populated if found or created
+        
+        If user not found: creates user + session atomically.
+        If user found but session not found: creates session for existing user.
         
         Must be implemented by subclasses for specific database backends.
         """

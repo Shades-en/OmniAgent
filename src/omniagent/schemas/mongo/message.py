@@ -5,7 +5,7 @@ import pymongo
 from bson import ObjectId
 
 from pydantic import Field
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, ClassVar
 from datetime import datetime, timezone
 
 from opentelemetry.trace import SpanKind
@@ -14,7 +14,9 @@ from omniagent.utils.tracing import trace_operation, CustomSpanKinds
 from omniagent.exceptions import (
     MessageRetrievalError,
     MessageDeletionError,
+    MessageUpdateError,
 )
+from omniagent.types import Feedback
 from omniagent.config import DEFAULT_MESSAGE_PAGE_SIZE, MAX_TURNS_TO_FETCH
 from omniagent.types.message import Role, MessageAITextPart, MessageReasoningPart, MessageToolPart, MessageHumanTextPart, MessageDTO
 from omniagent.schemas.mongo.public_dict import PublicDictMixin
@@ -24,7 +26,7 @@ if TYPE_CHECKING:
     from omniagent.schemas.mongo.summary import Summary
 
 class Message(PublicDictMixin, Document):
-    PUBLIC_EXCLUDE = {"id", "session", "previous_summary", "client_message_id"}
+    PUBLIC_EXCLUDE: ClassVar[set[str]] = {"id", "session", "previous_summary", "client_message_id"}
 
     role: Role
     metadata: dict = Field(default_factory=dict)
@@ -355,4 +357,160 @@ class Message(PublicDictMixin, Document):
             raise MessageDeletionError(
                 "Failed to delete message by client ID",
                 details=f"client_message_id={client_message_id}, error={str(e)}"
-            ) 
+            )
+    
+    @classmethod
+    async def get_by_client_message_id_and_cookie(cls, client_message_id: str, cookie_id: str) -> Message | None:
+        """
+        Retrieve a message by its client_message_id (frontend-generated ID), filtered by user's cookie_id.
+        This ensures users can only access messages from their own sessions.
+        
+        Args:
+            client_message_id: The frontend-generated message ID (from AI SDK)
+            cookie_id: The user's cookie ID for authorization
+            
+        Returns:
+            Message if found and belongs to user's session, None otherwise
+            
+        Raises:
+            MessageRetrievalError: If retrieval fails
+        """
+        try:
+            # Query message by client_message_id and filter by session's user's client_id
+            pipeline = [
+                {
+                    "$match": {
+                        "client_message_id": client_message_id
+                    }
+                },
+                {
+                    "$lookup": {
+                        "from": "sessions",
+                        "localField": "session._id",
+                        "foreignField": "_id",
+                        "as": "session_data"
+                    }
+                },
+                {
+                    "$unwind": "$session_data"
+                },
+                {
+                    "$lookup": {
+                        "from": "users",
+                        "localField": "session_data.user.$id",
+                        "foreignField": "_id",
+                        "as": "user_data"
+                    }
+                },
+                {
+                    "$unwind": "$user_data"
+                },
+                {
+                    "$match": {
+                        "user_data.client_id": cookie_id
+                    }
+                }
+            ]
+            
+            results = await cls.aggregate(pipeline).to_list()
+            if not results:
+                return None
+            return cls.model_validate(results[0])
+        except Exception as e:
+            raise MessageRetrievalError(
+                "Failed to retrieve message by client ID and cookie",
+                details=f"client_message_id={client_message_id}, cookie_id={cookie_id}, error={str(e)}"
+            )
+    
+    @classmethod
+    @trace_operation(kind=SpanKind.INTERNAL, open_inference_kind=CustomSpanKinds.DATABASE.value)
+    async def update_feedback_by_cookie(cls, client_message_id: str, feedback: Feedback | None, cookie_id: str) -> dict:
+        """
+        Update the feedback for a message, authorized by cookie_id.
+        
+        Args:
+            client_message_id: The frontend-generated message ID (from AI SDK)
+            feedback: The feedback value (LIKE, DISLIKE, or None for neutral)
+            cookie_id: The user's cookie ID for authorization
+            
+        Returns:
+            Dictionary with update info: {
+                "message_updated": bool,
+                "message_id": str,
+                "feedback": str | None
+            }
+            
+        Raises:
+            MessageUpdateError: If update fails
+        
+        Traced as INTERNAL span for database operation.
+        """
+        try:
+            message = await cls.get_by_client_message_id_and_cookie(client_message_id, cookie_id)
+            
+            if not message:
+                return {
+                    "message_updated": False,
+                    "message_id": client_message_id,
+                    "feedback": feedback.value if feedback else None
+                }
+            
+            message.feedback = feedback
+            await message.save()
+            
+            return {
+                "message_updated": True,
+                "message_id": client_message_id,
+                "feedback": feedback.value if feedback else None
+            }
+                    
+        except Exception as e:
+            raise MessageUpdateError(
+                "Failed to update message feedback",
+                details=f"client_message_id={client_message_id}, feedback={feedback}, error={str(e)}"
+            )
+    
+    @classmethod
+    @trace_operation(kind=SpanKind.INTERNAL, open_inference_kind=CustomSpanKinds.DATABASE.value)
+    async def delete_by_client_message_id_and_cookie(cls, client_message_id: str, cookie_id: str) -> dict:
+        """
+        Delete a message by its client ID, authorized by cookie_id.
+        
+        Args:
+            client_message_id: The frontend-generated message ID (from AI SDK)
+            cookie_id: The user's cookie ID for authorization
+            
+        Returns:
+            Dictionary with deletion info: {
+                "message_deleted": bool,
+                "deleted_count": int  # Number of documents deleted (0 or 1)
+            }
+            
+        Raises:
+            MessageDeletionError: If deletion fails
+        
+        Traced as INTERNAL span for database operation.
+        """
+        try:
+            message = await cls.get_by_client_message_id_and_cookie(client_message_id, cookie_id)
+            
+            if not message:
+                return {
+                    "message_deleted": False,
+                    "deleted_count": 0
+                }
+            
+            delete_result = await message.delete()
+            
+            deleted_count = delete_result.deleted_count if delete_result else 0
+            
+            return {
+                "message_deleted": deleted_count > 0,
+                "deleted_count": deleted_count
+            }
+                    
+        except Exception as e:
+            raise MessageDeletionError(
+                "Failed to delete message by client ID",
+                details=f"client_message_id={client_message_id}, error={str(e)}"
+            )

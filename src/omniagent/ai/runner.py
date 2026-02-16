@@ -45,7 +45,6 @@ class Runner:
     def __init__(self, agent: Agent, session_manager: SessionManager, options: RunnerOptions | None = None) -> None:
         self.agent = agent
         self.session_manager = session_manager
-        self.skip_cache = config.SKIP_CACHE
         self.options = options or RunnerOptions()
         self.llm_provider = get_llm_provider(
             provider_name=config.LLM_PROVIDER,
@@ -116,7 +115,7 @@ class Runner:
                 turns_after_last_summary=self.session_manager.state.turns_after_last_summary,
                 context_token_count=self.session_manager.state.total_token_after_last_summary,
                 tool_call=tool_call,
-                new_chat=self.session_manager.state.new_chat,
+                new_chat=self.session_manager.new_chat,
                 turn_number=self.session_manager.state.turn_number
             ),
         )

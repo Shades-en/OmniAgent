@@ -10,5 +10,3 @@ class State(BaseModel):
     active_summary: Any = None # Summary | None - using Any to avoid circular import with Pydantic
     user_defined_state: dict = {}
     turn_number: int = 1
-    new_chat: bool = True
-    new_user: bool = True

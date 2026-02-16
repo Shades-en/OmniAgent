@@ -7,7 +7,7 @@ from bson import ObjectId
 
 from datetime import datetime, timezone
 from pydantic import Field
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Self, ClassVar
 from pydantic import model_validator
 
 from omniagent.utils.tracing import trace_method
@@ -23,7 +23,7 @@ from omniagent.utils.general import get_token_count
 from omniagent.schemas.mongo.public_dict import PublicDictMixin
 
 class Summary(PublicDictMixin, Document):
-    PUBLIC_EXCLUDE = {"session"}
+    PUBLIC_EXCLUDE: ClassVar[set[str]] = {"session"}
 
     content: str
     token_count: int = Field(default=0)

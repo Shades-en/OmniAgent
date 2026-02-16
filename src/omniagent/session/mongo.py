@@ -14,10 +14,6 @@ from omniagent.db.document_models import DocumentModels, get_message_model, get_
 from omniagent.schemas.mongo import User, Session, Summary
 from omniagent.protocols import MessageProtocol
 from omniagent.config import MAX_TURNS_TO_FETCH, LLM_PROVIDER
-from omniagent.exceptions import (
-    SessionNotFoundError,
-    UserNotFoundError,
-)
 from omniagent.utils.tracing import trace_method, CustomSpanKinds
 from omniagent.ai.providers.utils import StreamCallback, stream_fallback_response
 from omniagent.db.mongo import MongoDB
@@ -87,7 +83,7 @@ class MongoSessionManager(SessionManager):
         max_chat_name_length: int = 50,
         max_chat_name_words: int = 5,
         session_id: str | None = None,
-        user_id: str | None = None,
+        client_id: str | None = None,
         provider_name: str | None = None,
     ) -> str:
         """
@@ -105,7 +101,7 @@ class MongoSessionManager(SessionManager):
                 max_chat_name_words=max_chat_name_words,
             )
 
-        session = await Session.get_by_id(session_id=session_id, user_id=user_id)
+        session = await Session.get_by_id_and_client_id(session_id=session_id, client_id=client_id) if client_id else None
         if session is None:
             return await llm_provider.generate_chat_name(
                 query=query,
@@ -142,38 +138,43 @@ class MongoSessionManager(SessionManager):
     )
     async def _fetch_user_or_session(self) -> None:
         """
-        Fetch user or session based on new_user and new_chat flags.
+        Fetch user and session in parallel based on client_id and session_id.
         
-        - new_user=False, new_chat=True  -> Fetch user only
-        - new_user=False, new_chat=False -> Fetch session only
-        - new_user=True -> Do nothing (new user, no data to fetch)
+        Sets instance variables:
+        - self.new_user = True if user not found
+        - self.new_chat = True if session not found (or new user)
+        - self.user and self.session populated if found or created
+        
+        If user not found: creates user + session atomically.
+        If user found but session not found: creates session for existing user.
         """
-        if self.state.new_user:
-            # New user - nothing to fetch
+        # Fetch user and session in parallel
+        user_task = User.get_by_client_id(self.user_client_id)
+        session_task = (
+            Session.get_by_id_and_client_id(self.session_id, self.user_client_id)
+            if self.session_id
+            else asyncio.coroutine(lambda: None)()
+        )
+        
+        self.user, self.session = await asyncio.gather(user_task, session_task)
+        
+        # Case 1: User not found - create user + session atomically
+        if not self.user:
+            self.new_user = True
+            self.new_chat = True
+            self.session = await Session.create_with_user(
+                client_id=self.user_client_id,
+                session_id=self.session_id,
+            )
             return
         
-        if self.state.new_chat:
-            # Existing user, new chat - fetch user only
-            self.user = await User.get_by_id_or_client_id(self.user_id, self.user_client_id)
-            if not self.user:
-                raise UserNotFoundError(
-                    "User not found for provided identifiers",
-                    details=f"user_id={self.user_id}, user_client_id={self.user_client_id}"
-                )
-        else:
-            # Existing user, existing chat - fetch session only
-            if self.session_id:
-                if self.user_id:
-                    # Primary: use user_id for direct query
-                    self.session = await Session.get_by_id(self.session_id, self.user_id)
-                elif self.user_client_id:
-                    # Fallback: use client_id with aggregation lookup
-                    self.session = await Session.get_by_id_and_client_id(self.session_id, self.user_client_id)
-            if not self.session:
-                raise SessionNotFoundError(
-                    f"Session not found for session_id: {self.session_id}",
-                    details=f"session_id={self.session_id}, user_id={self.user_id}, user_client_id={self.user_client_id}"
-                )
+        # Case 2: User found but session not found - create session for existing user
+        if not self.session:
+            self.new_chat = True
+            self.session = await Session.create_for_existing_user(
+                user=self.user,
+                session_id=self.session_id,
+            )
 
     @trace_method(
         kind=CustomSpanKinds.DATABASE.value,
@@ -191,7 +192,7 @@ class MongoSessionManager(SessionManager):
         
         Traced as DATABASE span for database fetch operations.
         """
-        if self.state.new_chat or not self.session_id:
+        if self.new_chat or not self.session_id:
             return [], None
         
         MessageModel = get_message_model()
@@ -228,21 +229,11 @@ class MongoSessionManager(SessionManager):
         on_stream_event: StreamCallback | None = None,
     ) -> List[MessageDTO]:
         """
-        Create/update user and session, then insert messages into MongoDB.
-        """
-        # Case 1: New user and new session - create both atomically
-        if not self.session and not self.user:
-            self.session = await Session.create_with_user(
-                client_id=self.user_client_id,
-                session_id=self.session_id,
-            )
-        # Case 2: Existing user, new session - create session for existing user
-        elif not self.session and self.user:
-            self.session = await Session.create_for_existing_user(
-                user=self.user,
-                session_id=self.session_id,
-            )
+        Insert messages into MongoDB for the current session.
         
+        Note: User and session creation is now handled in _fetch_user_or_session,
+        so self.session is guaranteed to exist at this point.
+        """
         # Insert messages for the session
         if self.session:
             turn_number = self.state.turn_number

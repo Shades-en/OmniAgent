@@ -6,12 +6,12 @@ from omniagent.types.message import (
     MessageHumanTextPart,
     MessageAITextPart,
     MessageReasoningPart,
-    MessageToolCallPart,
     MessageDTO,
 )
 from omniagent.types.chat import MessageQuery, APIType, RunnerOptions
-from omniagent.types.state import SessionState
+from omniagent.types.state import State
 from omniagent.types.user import UserType
+from omniagent.types.feedback import Feedback
 
 __all__ = [
     # Message types
@@ -20,14 +20,15 @@ __all__ = [
     "MessageHumanTextPart",
     "MessageAITextPart",
     "MessageReasoningPart",
-    "MessageToolCallPart",
     "MessageDTO",
     # Chat types
     "MessageQuery",
     "APIType",
     "RunnerOptions",
     # State types
-    "SessionState",
+    "State",
     # User types
     "UserType",
+    # Feedback types
+    "Feedback",
 ]

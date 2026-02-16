@@ -6,7 +6,7 @@ from bson import ObjectId
 
 from datetime import datetime, timezone
 from pydantic import Field
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, ClassVar
 import asyncio
 
 from opentelemetry.trace import SpanKind
@@ -31,7 +31,7 @@ from omniagent.schemas.mongo.public_dict import PublicDictMixin
 
 
 class Session(PublicDictMixin, Document):
-    PUBLIC_EXCLUDE = {"user"}
+    PUBLIC_EXCLUDE: ClassVar[set[str]] = {"user"}
 
     name: str = Field(default_factory=lambda: DEFAULT_SESSION_NAME)
     latest_turn_number: int = Field(...)
@@ -353,6 +353,239 @@ class Session(PublicDictMixin, Document):
             raise SessionUpdateError(
                 "Failed to update session starred status",
                 details=f"session_id={session_id}, starred={starred}, error={str(e)}"
+            )
+    
+    @classmethod
+    @trace_operation(kind=SpanKind.INTERNAL, open_inference_kind=CustomSpanKinds.DATABASE.value)
+    async def update_starred_by_client_id(cls, session_id: str, starred: bool, client_id: str) -> dict:
+        """
+        Update the starred status for a session, authorized by client_id.
+        
+        Args:
+            session_id: The session ID to update
+            starred: Whether the session should be starred (True) or unstarred (False)
+            client_id: The user's client ID for authorization
+            
+        Returns:
+            Dictionary with update info: {
+                "session_updated": bool,
+                "session_id": str,
+                "starred": bool
+            }
+            
+        Raises:
+            SessionUpdateError: If update fails
+        
+        Traced as INTERNAL span for database operation.
+        """
+        try:
+            session = await cls.get_by_id_and_client_id(session_id, client_id)
+            
+            if not session:
+                raise SessionUpdateError(
+                    "Session not found",
+                    details=f"session_id={session_id}"
+                )
+            
+            session.starred = starred
+            await session.save()
+            
+            return {
+                "session_updated": True,
+                "session_id": session_id,
+                "starred": starred
+            }
+                    
+        except SessionUpdateError:
+            raise
+        except Exception as e:
+            raise SessionUpdateError(
+                "Failed to update session starred status",
+                details=f"session_id={session_id}, starred={starred}, error={str(e)}"
+            )
+    
+    @classmethod
+    @trace_operation(kind=SpanKind.INTERNAL, open_inference_kind=CustomSpanKinds.DATABASE.value)
+    async def update_name_by_client_id(cls, session_id: str, name: str, client_id: str) -> dict:
+        """
+        Update the name for a session, authorized by client_id.
+        
+        Args:
+            session_id: The session ID to update
+            name: The new name for the session
+            client_id: The user's client ID for authorization
+            
+        Returns:
+            Dictionary with update info: {
+                "session_updated": bool,
+                "session_id": str,
+                "name": str
+            }
+            
+        Raises:
+            SessionUpdateError: If update fails
+        
+        Traced as INTERNAL span for database operation.
+        """
+        try:
+            session = await cls.get_by_id_and_client_id(session_id, client_id)
+            
+            if not session:
+                return {
+                    "session_updated": False,
+                    "session_id": session_id,
+                    "name": name
+                }
+            
+            session.name = name
+            await session.save()
+            
+            return {
+                "session_updated": True,
+                "session_id": session_id,
+                "name": name
+            }
+                    
+        except Exception as e:
+            raise SessionUpdateError(
+                "Failed to update session name",
+                details=f"session_id={session_id}, name={name}, error={str(e)}"
+            )
+    
+    @classmethod
+    @trace_operation(kind=SpanKind.INTERNAL, open_inference_kind=CustomSpanKinds.DATABASE.value)
+    async def delete_with_related_by_client_id(cls, session_id: str, client_id: str) -> dict:
+        """
+        Delete session and all related documents (messages, summaries) in a transaction,
+        authorized by client_id.
+        
+        Args:
+            session_id: MongoDB document ID of the session to delete
+            client_id: The user's client ID for authorization
+        
+        Returns:
+            Dictionary with deletion counts: {
+                "messages_deleted": int, 
+                "summaries_deleted": int,
+                "session_deleted": bool
+            }
+        
+        Raises:
+            SessionDeletionError: If deletion fails
+        
+        Traced as INTERNAL span for database transaction with cascade delete.
+        """
+        from omniagent.db import MongoDB
+        
+        try:
+            message_model = get_message_model()
+            summary_model = get_summary_model()
+            session = await cls.get_by_id_and_client_id(session_id, client_id)
+            
+            if not session:
+                return {
+                    "messages_deleted": 0,
+                    "summaries_deleted": 0,
+                    "session_deleted": False
+                }
+            
+            client = MongoDB.get_client()
+            session_obj_id = session.id
+            
+            async with client.start_session() as session_txn:
+                async with await session_txn.start_transaction():
+                    delete_results = await asyncio.gather(
+                        session.delete(session=session_txn),
+                        message_model.find(message_model.session._id == session_obj_id).delete(session=session_txn),
+                        summary_model.find(summary_model.session._id == session_obj_id).delete(session=session_txn)
+                    )
+                    
+                    messages_deleted = delete_results[1].deleted_count if delete_results[1] else 0
+                    summaries_deleted = delete_results[2].deleted_count if delete_results[2] else 0
+                    
+                    return {
+                        "messages_deleted": messages_deleted,
+                        "summaries_deleted": summaries_deleted,
+                        "session_deleted": True
+                    }
+                    
+        except Exception as e:
+            raise SessionDeletionError(
+                "Failed to delete session with related documents",
+                details=f"session_id={session_id}, error={str(e)}"
+            )
+    
+    @classmethod
+    @trace_operation(kind=SpanKind.INTERNAL, open_inference_kind=CustomSpanKinds.DATABASE.value)
+    async def delete_all_by_user_client_id(cls, client_id: str) -> dict:
+        """
+        Delete all sessions for a user by client_id and all related documents (messages, summaries).
+        
+        Args:
+            client_id: The user's client ID
+        
+        Returns:
+            Dictionary with deletion counts: {
+                "sessions_deleted": int,
+                "messages_deleted": int, 
+                "summaries_deleted": int
+            }
+        
+        Raises:
+            SessionDeletionError: If deletion fails
+        
+        Traced as INTERNAL span for database transaction with cascade delete.
+        """
+        from omniagent.db import MongoDB
+        
+        try:
+            message_model = get_message_model()
+            summary_model = get_summary_model()
+            
+            # Get user by client_id first
+            user = await User.get_by_client_id(client_id)
+            if not user:
+                return {
+                    "sessions_deleted": 0,
+                    "messages_deleted": 0,
+                    "summaries_deleted": 0
+                }
+            
+            user_obj_id = user.id
+            
+            # Check if user has any sessions
+            sessions = await cls.find(cls.user.id == user_obj_id).to_list()
+            if not sessions:
+                return {
+                    "sessions_deleted": 0,
+                    "messages_deleted": 0,
+                    "summaries_deleted": 0
+                }
+            
+            client = MongoDB.get_client()
+            
+            async with client.start_session() as session_txn:
+                async with await session_txn.start_transaction():
+                    delete_results = await asyncio.gather(
+                        cls.find(cls.user.id == user_obj_id).delete(session=session_txn),
+                        message_model.find({"session.user.$id": user_obj_id}).delete(session=session_txn),
+                        summary_model.find({"session.user.$id": user_obj_id}).delete(session=session_txn)
+                    )
+                    
+                    sessions_deleted = delete_results[0].deleted_count if delete_results[0] else 0
+                    messages_deleted = delete_results[1].deleted_count if delete_results[1] else 0
+                    summaries_deleted = delete_results[2].deleted_count if delete_results[2] else 0
+                    
+                    return {
+                        "sessions_deleted": sessions_deleted,
+                        "messages_deleted": messages_deleted,
+                        "summaries_deleted": summaries_deleted
+                    }
+                    
+        except Exception as e:
+            raise SessionDeletionError(
+                "Failed to delete all sessions for user",
+                details=f"client_id={client_id}, error={str(e)}"
             )
     
     @classmethod
