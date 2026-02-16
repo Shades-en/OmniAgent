@@ -8,9 +8,10 @@ from typing import List, Tuple
 import logging
 
 from omniagent.session.base import SessionManager
+from omniagent.ai.providers import get_llm_provider
 from omniagent.types.message import MessageDTO
 from omniagent.schemas.mongo import User, Session, Message, Summary
-from omniagent.config import MAX_TURNS_TO_FETCH
+from omniagent.config import MAX_TURNS_TO_FETCH, LLM_PROVIDER
 from omniagent.exceptions import (
     SessionNotFoundError,
     UserNotFoundError,
@@ -70,6 +71,59 @@ class MongoSessionManager(SessionManager):
         This should be called during application shutdown (e.g., FastAPI lifespan).
         """
         await MongoDB.close()
+
+    @classmethod
+    async def generate_chat_name(
+        cls,
+        *,
+        query: str,
+        turns_between_chat_name: int = 20,
+        max_chat_name_length: int = 50,
+        max_chat_name_words: int = 5,
+        session_id: str | None = None,
+        user_id: str | None = None,
+        provider_name: str | None = None,
+    ) -> str:
+        """
+        Generate a meaningful, concise chat name based on a query and optional session context.
+
+        - If no session_id: generate from query only.
+        - If session_id: fetch summary + recent messages for context (if session exists for user).
+        """
+        llm_provider = get_llm_provider(provider_name=provider_name or LLM_PROVIDER)
+
+        if not session_id:
+            return await llm_provider.generate_chat_name(
+                query=query,
+                max_chat_name_length=max_chat_name_length,
+                max_chat_name_words=max_chat_name_words,
+            )
+
+        session = await Session.get_by_id(session_id=session_id, user_id=user_id)
+        if session is None:
+            return await llm_provider.generate_chat_name(
+                query=query,
+                max_chat_name_length=max_chat_name_length,
+                max_chat_name_words=max_chat_name_words,
+            )
+
+        chat_name_context_max_messages = 2 * turns_between_chat_name
+        summary_task = Summary.get_latest_by_session(session_id=session_id)
+        messages_task = Message.get_paginated_by_session(
+            session_id=session_id,
+            page=1,
+            page_size=chat_name_context_max_messages,
+        )
+        summary, messages = await asyncio.gather(summary_task, messages_task)
+
+        conversation_to_summarize = Message.to_dtos(messages) if messages else None
+        return await llm_provider.generate_chat_name(
+            query=query,
+            previous_summary=summary,
+            conversation_to_summarize=conversation_to_summarize,
+            max_chat_name_length=max_chat_name_length,
+            max_chat_name_words=max_chat_name_words,
+        )
 
     @trace_method(
         kind=CustomSpanKinds.DATABASE.value,
