@@ -57,7 +57,7 @@ class SessionManager(ABC):
         self, 
         user_id: str | None, 
         session_id: str | None, 
-        user_cookie: str,
+        user_client_id: str,
         new_chat: bool, 
         new_user: bool,
         state: dict = {}, 
@@ -69,7 +69,7 @@ class SessionManager(ABC):
         )
         self.user_id = user_id
         self.session_id = session_id
-        self.user_cookie = user_cookie
+        self.user_client_id = user_client_id
         self.user: UserProtocol | None = None
         self.session: SessionProtocol | None = None
 

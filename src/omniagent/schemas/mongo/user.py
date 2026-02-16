@@ -22,7 +22,7 @@ from omniagent.schemas.mongo.public_dict import PublicDictMixin
 
 
 class User(PublicDictMixin, Document):
-    cookie_id: str = Field(..., min_length=1)
+    client_id: str = Field(..., min_length=1)
     category: UserType = UserType.GUEST
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -30,7 +30,7 @@ class User(PublicDictMixin, Document):
         name = "users"
         indexes = [
             IndexModel(
-                [("cookie_id", pymongo.ASCENDING)],
+                [("client_id", pymongo.ASCENDING)],
                 unique=True,
             )
         ]
@@ -47,24 +47,24 @@ class User(PublicDictMixin, Document):
             )
     
     @classmethod
-    async def get_by_cookie_id(cls, cookie_id: str) -> User | None:
-        """Retrieve a user by their cookie ID."""
+    async def get_by_client_id(cls, client_id: str) -> User | None:
+        """Retrieve a user by their client ID."""
         try:
-            return await cls.find_one(cls.cookie_id == cookie_id)
+            return await cls.find_one(cls.client_id == client_id)
         except Exception as e:
             raise UserRetrievalError(
-                "Failed to retrieve user by cookie ID",
-                details=f"cookie_id={cookie_id}, error={str(e)}"
+                "Failed to retrieve user by client ID",
+                details=f"client_id={client_id}, error={str(e)}"
             )
     
     @classmethod
-    async def get_by_id_or_cookie(cls, user_id: str | None, cookie_id: str) -> User | None:
+    async def get_by_id_or_client_id(cls, user_id: str | None, client_id: str) -> User | None:
         """
-        Retrieve a user by ID or cookie ID.
+        Retrieve a user by ID or client ID.
         
         Args:
             user_id: MongoDB document ID of the user (optional)
-            cookie_id: Cookie ID of the user
+            client_id: Client ID of the user
             
         Returns:
             User object if found, None otherwise        
@@ -72,16 +72,16 @@ class User(PublicDictMixin, Document):
         if user_id:
             return await cls.get_by_id(user_id)
         else:
-            return await cls.get_by_cookie_id(cookie_id)
+            return await cls.get_by_client_id(client_id)
     
     @classmethod
-    async def delete_by_id_or_cookie(cls, user_id: str | None, cookie_id: str, cascade: bool = True) -> dict:
+    async def delete_by_id_or_client_id(cls, user_id: str | None, client_id: str, cascade: bool = True) -> dict:
         """
-        Delete a user by ID or cookie ID and optionally cascade delete all related sessions.
+        Delete a user by ID or client ID and optionally cascade delete all related sessions.
         
         Args:
             user_id: MongoDB document ID of the user (optional)
-            cookie_id: Cookie ID of the user
+            client_id: Client ID of the user
             cascade: If True, also delete all sessions (and their messages/turns/summaries)
             
         Returns:
@@ -99,16 +99,16 @@ class User(PublicDictMixin, Document):
         if user_id:
             return await cls.delete_by_id(user_id, cascade=cascade)
         else:
-            return await cls.delete_by_cookie_id(cookie_id, cascade=cascade)
+            return await cls.delete_by_client_id(client_id, cascade=cascade)
     
     @classmethod
     @trace_operation(kind=SpanKind.INTERNAL, open_inference_kind=CustomSpanKinds.DATABASE.value)
-    async def delete_by_cookie_id(cls, cookie_id: str, cascade: bool = True) -> dict:
+    async def delete_by_client_id(cls, client_id: str, cascade: bool = True) -> dict:
         """
-        Delete a user by cookie ID and optionally cascade delete all related sessions.
+        Delete a user by client ID and optionally cascade delete all related sessions.
         
         Args:
-            cookie_id: Cookie ID of the user to delete
+            client_id: Client ID of the user to delete
             cascade: If True, also delete all sessions (and their messages/turns/summaries)
             
         Returns:
@@ -126,7 +126,7 @@ class User(PublicDictMixin, Document):
         Traced as INTERNAL span for database transaction.
         """
         try:
-            user = await cls.get_by_cookie_id(cookie_id)
+            user = await cls.get_by_client_id(client_id)
             if not user:
                 return {
                     "user_deleted": False,
@@ -140,8 +140,8 @@ class User(PublicDictMixin, Document):
             
         except Exception as e:
             raise UserDeletionError(
-                "Failed to delete user by cookie ID",
-                details=f"cookie_id={cookie_id}, cascade={cascade}, error={str(e)}"
+                "Failed to delete user by client ID",
+                details=f"client_id={client_id}, cascade={cascade}, error={str(e)}"
             )
     
     @classmethod

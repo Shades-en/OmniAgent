@@ -79,14 +79,14 @@ class Session(PublicDictMixin, Document):
             )
     
     @classmethod
-    async def get_by_id_and_cookie(cls, session_id: str, cookie_id: str) -> Session | None:
+    async def get_by_id_and_client_id(cls, session_id: str, client_id: str) -> Session | None:
         """
-        Retrieve a session by its MongoDB document ID, filtered by user's cookie_id.
+        Retrieve a session by its MongoDB document ID, filtered by user's client_id.
         This is a fallback method when user_id is not available.
         
         Args:
             session_id: The session's MongoDB document ID
-            cookie_id: The user's cookie ID for authorization
+            client_id: The user's client ID for authorization
             
         Returns:
             Session if found and belongs to user, None otherwise
@@ -114,7 +114,7 @@ class Session(PublicDictMixin, Document):
                 },
                 {
                     "$match": {
-                        "user_data.cookie_id": cookie_id
+                        "user_data.client_id": client_id
                     }
                 }
             ]
@@ -125,8 +125,8 @@ class Session(PublicDictMixin, Document):
             return cls.model_validate(results[0])
         except Exception as e:
             raise SessionRetrievalError(
-                "Failed to retrieve session by ID and cookie",
-                details=f"session_id={session_id}, cookie_id={cookie_id}, error={str(e)}"
+                "Failed to retrieve session by ID and client_id",
+                details=f"session_id={session_id}, client_id={client_id}, error={str(e)}"
             )
     
     @classmethod
@@ -138,7 +138,7 @@ class Session(PublicDictMixin, Document):
     )
     async def create_with_user(
         cls,
-        cookie_id: str,
+        client_id: str,
         session_id: str,
         session_name: str = DEFAULT_SESSION_NAME
     ) -> Session:
@@ -146,7 +146,7 @@ class Session(PublicDictMixin, Document):
         Create a new session with a new user atomically using MongoDB transaction.
         
         Args:
-            cookie_id: Cookie ID for the new user
+            client_id: Client ID for the new user
             session_id: MongoDB ObjectId string for the session (required)
             session_name: Name for the session
             
@@ -175,7 +175,7 @@ class Session(PublicDictMixin, Document):
             try:
                 async with await session_txn.start_transaction():
                     # Create new user
-                    new_user = User(cookie_id=cookie_id)
+                    new_user = User(client_id=client_id)
                     await new_user.insert(session=session_txn)
                     
                     # Create and save session with provided session_id
@@ -193,7 +193,7 @@ class Session(PublicDictMixin, Document):
                 # Transaction will automatically abort on exception
                 raise SessionCreationError(
                     "Failed to create session with user in transaction",
-                    details=f"cookie_id={cookie_id}, session_id={session_id}, session_name={session_name}, error={str(e)}"
+                    details=f"client_id={client_id}, session_id={session_id}, session_name={session_name}, error={str(e)}"
                 )
     
     @classmethod
@@ -562,18 +562,18 @@ class Session(PublicDictMixin, Document):
             )
     
     @classmethod
-    async def get_paginated_by_user_cookie(
+    async def get_paginated_by_user_client_id(
         cls,
-        cookie_id: str,
+        client_id: str,
         page: int = 1,
         page_size: int = DEFAULT_SESSION_PAGE_SIZE
     ) -> List[Session]:
         """
-        Get paginated sessions for a user by cookie ID, sorted by most recent first.
+        Get paginated sessions for a user by client ID, sorted by most recent first.
         Uses MongoDB aggregation with $lookup to join with users collection.
         
         Args:
-            cookie_id: The user's cookie ID
+            client_id: The user's client ID
             page: Page number (1-indexed)
             page_size: Number of sessions per page
             
@@ -586,7 +586,7 @@ class Session(PublicDictMixin, Document):
         try:
             skip = (page - 1) * page_size
             
-            # Aggregation pipeline to lookup user by cookie_id and get sessions
+            # Aggregation pipeline to lookup user by client_id and get sessions
             pipeline = [
                 {
                     "$lookup": {
@@ -601,7 +601,7 @@ class Session(PublicDictMixin, Document):
                 },
                 {
                     "$match": {
-                        "user_data.cookie_id": cookie_id
+                        "user_data.client_id": client_id
                     }
                 },
                 {
@@ -622,18 +622,18 @@ class Session(PublicDictMixin, Document):
             
         except Exception as e:
             raise SessionRetrievalError(
-                "Failed to retrieve paginated sessions for user by cookie",
-                details=f"cookie_id={cookie_id}, page={page}, page_size={page_size}, error={str(e)}"
+                "Failed to retrieve paginated sessions for user by client_id",
+                details=f"client_id={client_id}, page={page}, page_size={page_size}, error={str(e)}"
             )
     
     @classmethod
-    async def get_all_by_user_cookie(cls, cookie_id: str) -> List[Session]:
+    async def get_all_by_user_client_id(cls, client_id: str) -> List[Session]:
         """
-        Get all sessions for a user by cookie ID, sorted by most recent first.
+        Get all sessions for a user by client ID, sorted by most recent first.
         Uses MongoDB aggregation with $lookup to join with users collection.
         
         Args:
-            cookie_id: The user's cookie ID
+            client_id: The user's client ID
             
         Returns:
             List of all Session documents sorted by most recent first
@@ -642,7 +642,7 @@ class Session(PublicDictMixin, Document):
             SessionRetrievalError: If retrieval fails
         """
         try:
-            # Aggregation pipeline to lookup user by cookie_id and get all sessions
+            # Aggregation pipeline to lookup user by client_id and get all sessions
             pipeline = [
                 {
                     "$lookup": {
@@ -657,7 +657,7 @@ class Session(PublicDictMixin, Document):
                 },
                 {
                     "$match": {
-                        "user_data.cookie_id": cookie_id
+                        "user_data.client_id": client_id
                     }
                 },
                 {
@@ -672,18 +672,18 @@ class Session(PublicDictMixin, Document):
             
         except Exception as e:
             raise SessionRetrievalError(
-                "Failed to retrieve all sessions for user by cookie",
-                details=f"cookie_id={cookie_id}, error={str(e)}"
+                "Failed to retrieve all sessions for user by client_id",
+                details=f"client_id={client_id}, error={str(e)}"
             )
     
     @classmethod
-    async def count_by_user_cookie(cls, cookie_id: str) -> int:
+    async def count_by_user_client_id(cls, client_id: str) -> int:
         """
-        Get the total count of sessions for a user by cookie ID.
+        Get the total count of sessions for a user by client ID.
         Uses MongoDB aggregation with $lookup to join with users collection.
         
         Args:
-            cookie_id: The user's cookie ID
+            client_id: The user's client ID
             
         Returns:
             Total count of sessions for the user
@@ -692,7 +692,7 @@ class Session(PublicDictMixin, Document):
             SessionRetrievalError: If retrieval fails
         """
         try:
-            # Aggregation pipeline to lookup user by cookie_id and count sessions
+            # Aggregation pipeline to lookup user by client_id and count sessions
             pipeline = [
                 {
                     "$lookup": {
@@ -707,7 +707,7 @@ class Session(PublicDictMixin, Document):
                 },
                 {
                     "$match": {
-                        "user_data.cookie_id": cookie_id
+                        "user_data.client_id": client_id
                     }
                 },
                 {
@@ -722,18 +722,18 @@ class Session(PublicDictMixin, Document):
             
         except Exception as e:
             raise SessionRetrievalError(
-                "Failed to count sessions for user by cookie",
-                details=f"cookie_id={cookie_id}, error={str(e)}"
+                "Failed to count sessions for user by client_id",
+                details=f"client_id={client_id}, error={str(e)}"
             )
     
     @classmethod
-    async def get_starred_by_user_cookie(cls, cookie_id: str) -> List[Session]:
+    async def get_starred_by_user_client_id(cls, client_id: str) -> List[Session]:
         """
-        Get all starred sessions for a user by cookie ID, sorted by most recently updated first.
+        Get all starred sessions for a user by client ID, sorted by most recently updated first.
         Uses MongoDB aggregation with $lookup to join with users collection.
         
         Args:
-            cookie_id: The user's cookie ID
+            client_id: The user's client ID
             
         Returns:
             List of starred Session documents sorted by most recently updated first
@@ -742,7 +742,7 @@ class Session(PublicDictMixin, Document):
             SessionRetrievalError: If retrieval fails
         """
         try:
-            # Aggregation pipeline to lookup user by cookie_id and get starred sessions
+            # Aggregation pipeline to lookup user by client_id and get starred sessions
             pipeline = [
                 {
                     "$lookup": {
@@ -757,7 +757,7 @@ class Session(PublicDictMixin, Document):
                 },
                 {
                     "$match": {
-                        "user_data.cookie_id": cookie_id,
+                        "user_data.client_id": client_id,
                         "starred": True
                     }
                 },
@@ -773,8 +773,8 @@ class Session(PublicDictMixin, Document):
             
         except Exception as e:
             raise SessionRetrievalError(
-                "Failed to retrieve starred sessions for user by cookie",
-                details=f"cookie_id={cookie_id}, error={str(e)}"
+                "Failed to retrieve starred sessions for user by client_id",
+                details=f"client_id={client_id}, error={str(e)}"
             )
 
         

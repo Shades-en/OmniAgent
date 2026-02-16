@@ -154,11 +154,11 @@ class MongoSessionManager(SessionManager):
         
         if self.state.new_chat:
             # Existing user, new chat - fetch user only
-            self.user = await User.get_by_id_or_cookie(self.user_id, self.user_cookie)
+            self.user = await User.get_by_id_or_client_id(self.user_id, self.user_client_id)
             if not self.user:
                 raise UserNotFoundError(
                     "User not found for provided identifiers",
-                    details=f"user_id={self.user_id}, user_cookie={self.user_cookie}"
+                    details=f"user_id={self.user_id}, user_client_id={self.user_client_id}"
                 )
         else:
             # Existing user, existing chat - fetch session only
@@ -166,13 +166,13 @@ class MongoSessionManager(SessionManager):
                 if self.user_id:
                     # Primary: use user_id for direct query
                     self.session = await Session.get_by_id(self.session_id, self.user_id)
-                elif self.user_cookie:
-                    # Fallback: use cookie_id with aggregation lookup
-                    self.session = await Session.get_by_id_and_cookie(self.session_id, self.user_cookie)
+                elif self.user_client_id:
+                    # Fallback: use client_id with aggregation lookup
+                    self.session = await Session.get_by_id_and_client_id(self.session_id, self.user_client_id)
             if not self.session:
                 raise SessionNotFoundError(
                     f"Session not found for session_id: {self.session_id}",
-                    details=f"session_id={self.session_id}, user_id={self.user_id}, user_cookie={self.user_cookie}"
+                    details=f"session_id={self.session_id}, user_id={self.user_id}, user_client_id={self.user_client_id}"
                 )
 
     @trace_method(
@@ -233,7 +233,7 @@ class MongoSessionManager(SessionManager):
         # Case 1: New user and new session - create both atomically
         if not self.session and not self.user:
             self.session = await Session.create_with_user(
-                cookie_id=self.user_cookie,
+                client_id=self.user_client_id,
                 session_id=self.session_id,
             )
         # Case 2: Existing user, new session - create session for existing user

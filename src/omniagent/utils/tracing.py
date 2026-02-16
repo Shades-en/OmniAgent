@@ -78,7 +78,7 @@ def set_trace_context(
     query: str | None = None,
     session_id: str | None = None,
     user_id: str | None = None,
-    user_cookie: str | None = None,
+    user_client_id: str | None = None,
     new_chat: bool = False,
     new_user: bool = False,
 ) -> None:
@@ -92,7 +92,7 @@ def set_trace_context(
         query: User's input query/message
         session_id: MongoDB session ID
         user_id: MongoDB user ID
-        user_cookie: User's cookie ID
+        user_client_id: Consumer-provided user identifier (e.g., cookie, auth subject)
         new_chat: Whether this is a new chat session
         new_user: Whether this is a new user
     
@@ -101,7 +101,7 @@ def set_trace_context(
         ...     query="What's the weather like?",
         ...     session_id="507f1f77bcf86cd799439011",
         ...     user_id="507f191e810c19729de860ea",
-        ...     user_cookie="abc123",
+        ...     user_client_id="abc123",
         ...     new_chat=False,
         ...     new_user=False
         ... )
@@ -114,7 +114,7 @@ def set_trace_context(
         "query": query,
         "session_id": session_id,
         "user_id": user_id,
-        "user_cookie": user_cookie,
+        "user_client_id": user_client_id,
         "new_chat": new_chat,
         "new_user": new_user,
     })
@@ -125,7 +125,7 @@ def get_trace_context() -> dict[str, Any]:
     Get the current tracing context for this async execution.
     
     Returns:
-        Dictionary containing query, session_id, user_id, user_cookie, turn_number, new_chat, new_user.
+        Dictionary containing query, session_id, user_id, user_client_id, turn_number, new_chat, new_user.
         Returns empty dict if no context has been set.
     
     Example:
@@ -153,7 +153,7 @@ async def trace_context(
     query: str | None = None,
     session_id: str | None = None,
     user_id: str | None = None,
-    user_cookie: str | None = None,
+    user_client_id: str | None = None,
     new_chat: bool = False,
     new_user: bool = False,
 ):
@@ -167,7 +167,7 @@ async def trace_context(
         query: User's input query/message
         session_id: MongoDB session ID
         user_id: MongoDB user ID
-        user_cookie: User's cookie ID
+        user_client_id: Consumer-provided user identifier (e.g., cookie, auth subject)
         new_chat: Whether this is a new chat session
         new_user: Whether this is a new user
     
@@ -194,7 +194,7 @@ async def trace_context(
         query=query,
         session_id=session_id,
         user_id=user_id,
-        user_cookie=user_cookie,
+        user_client_id=user_client_id,
         new_chat=new_chat,
         new_user=new_user
     )
@@ -494,7 +494,7 @@ def trace_method(
                         SpanAttributes.INPUT_VALUE: input_value or "",
                         "session_id": ctx.get("session_id", ""),
                         "user_id": ctx.get("user_id", ""),
-                        "user_cookie": ctx.get("user_cookie", ""),
+                        "user_client_id": ctx.get("user_client_id", ""),
                         "turn_number": ctx.get("turn_number", ""),
                         "new_chat": ctx.get("new_chat", False),
                         "new_user": ctx.get("new_user", False),

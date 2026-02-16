@@ -14,7 +14,7 @@ from datetime import datetime
 class UserProtocol(Protocol):
     """Protocol for User objects across different DB backends."""
     id: Any
-    cookie_id: str
+    client_id: str
     created_at: datetime
 
 
