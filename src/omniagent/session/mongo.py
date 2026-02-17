@@ -85,6 +85,7 @@ class MongoSessionManager(SessionManager):
         session_id: str | None = None,
         client_id: str | None = None,
         provider_name: str | None = None,
+        provider_options: dict | None = None,
     ) -> str:
         """
         Generate a meaningful, concise chat name based on a query and optional session context.
@@ -92,7 +93,12 @@ class MongoSessionManager(SessionManager):
         - If no session_id: generate from query only.
         - If session_id: fetch summary + recent messages for context (if session exists for user).
         """
-        llm_provider = get_llm_provider(provider_name=provider_name or LLM_PROVIDER)
+        # Extract api_type from provider_options if available (for OpenAI)
+        # Other providers can use different keys from provider_options
+        llm_provider = get_llm_provider(
+            provider_name=provider_name or LLM_PROVIDER,
+            **(provider_options or {})
+        )
 
         if not session_id:
             return await llm_provider.generate_chat_name(

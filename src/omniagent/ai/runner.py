@@ -48,7 +48,7 @@ class Runner:
         self.options = options or RunnerOptions()
         self.llm_provider = get_llm_provider(
             provider_name=config.LLM_PROVIDER,
-            api_type=self.options.api_type,
+            **(self.options.provider_options or {}),
         )
 
     @trace_method(
