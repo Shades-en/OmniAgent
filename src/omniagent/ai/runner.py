@@ -342,3 +342,4 @@ class Runner:
 # Implement proper error handling in python
 # Should we create session and user before running agent loop? Because if i make it a framework then it should be able to handle it
 # on_stream_event -> Not using this at all
+# Tracing - remove functions not used.
