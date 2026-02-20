@@ -159,14 +159,7 @@ async def trace_context(
         ...     # Context is set here
         ...     result = await runner.run(query)
         ...     # Context automatically cleared on exit
-    
-    Example in ChatService:
-        >>> @classmethod
-        >>> async def chat(cls, query, session_id, user_id, ...):
-        ...     async with trace_context(query, session_id, user_id, ...):
-        ...         session_manager = SessionManager(...)
-        ...         runner = Runner(...)
-        ...         return await runner.run(query)
+
     """
     # Set context on entry
     set_trace_context(
