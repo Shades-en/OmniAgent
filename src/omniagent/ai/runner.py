@@ -234,36 +234,38 @@ class Runner:
                 regenerated_summary=False
             )
 
-    # Incase in future if handoff is required then make sure this function is retriggered
     @trace_method(
         kind=OpenInferenceSpanKindValues.AGENT,
         graph_node_id=lambda self: self.agent.name.lower()
     )
-    async def run(
+    async def _run_with_optional_stream(
         self,
         query_message: MessageQuery,
         on_stream_event: StreamCallback | None = None,
     ) -> dict:
+        stream_enabled = self.options.stream and on_stream_event is not None
+        stream_callback = on_stream_event if stream_enabled else None
         session_id = self.session_manager.session_id
         
         # Register task for cancellation when streaming is enabled
-        if self.options.stream and session_id:
+        if stream_enabled and session_id:
             current_task = asyncio.current_task()
             if current_task:
                 register_task(session_id, current_task)
         
         try:
-            result: QueryResult = await self._handle_query(query_message, on_stream_event)
+            result: QueryResult = await self._handle_query(query_message, stream_callback)
             # Shield update_user_session from task cancellation to ensure DB writes complete
             messages = await asyncio.shield(self.session_manager.update_user_session(
                 messages=result.messages,
                 summary=result.summary,
                 regenerated_summary=result.regenerated_summary,
-                on_stream_event=on_stream_event,
+                on_stream_event=stream_callback,
             ))
             
             # Send finish event after DB writes complete
-            await dispatch_stream_event(on_stream_event, create_finish_event("stop"))
+            if stream_enabled:
+                await dispatch_stream_event(stream_callback, create_finish_event("stop"))
             
             return {
                 "messages": [
@@ -279,8 +281,15 @@ class Runner:
             }
         finally:
             # Unregister task when done (success or failure)
-            if self.options.stream and session_id:
+            if stream_enabled and session_id:
                 unregister_task(session_id)
+
+    async def run(
+        self,
+        query_message: MessageQuery,
+    ) -> dict:
+        """Run agent in non-streaming mode."""
+        return await self._run_with_optional_stream(query_message=query_message)
 
     async def run_stream(
         self,
@@ -309,7 +318,7 @@ class Runner:
         
         async def run_chat():
             try:
-                result = await self.run(
+                result = await self._run_with_optional_stream(
                     query_message=query_message,
                     on_stream_event=stream_callback,
                 )
@@ -337,9 +346,3 @@ class Runner:
             yield format_sse_done()
         
         return event_generator(), result_future
-
-# File upload functionality
-# Implement proper error handling in python
-# Should we create session and user before running agent loop? Because if i make it a framework then it should be able to handle it
-# on_stream_event -> Not using this at all
-# Tracing - remove functions not used.

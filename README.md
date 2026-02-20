@@ -64,6 +64,7 @@ session_manager = MongoSessionManager(
 
 ```python
 from omniagent.ai.runner import Runner
+from omniagent.types.chat import MessageQuery
 
 runner = Runner(
     session_manager=session_manager,
@@ -72,8 +73,7 @@ runner = Runner(
 )
 
 result = await runner.run(
-    query="Hello, how are you?",
-    on_stream_event=stream_callback,  # Optional streaming
+    query_message=MessageQuery(query="Hello, how are you?"),
 )
 ```
 
@@ -165,3 +165,7 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request.
+
+# TODO
+
+- [ ] Add file upload support in runner flow
