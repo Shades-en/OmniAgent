@@ -141,6 +141,42 @@ Use explicit backend namespaces for schema imports.
 from omniagent.schemas.mongo import Session, User, Message, Summary
 ```
 
+## Consumer Extensions (Favorites)
+
+`starred`/favorite session behavior is intentionally not part of OmniAgent core.
+If your app needs favorites, extend `Session` in your consumer app and pass it through `DocumentModels`.
+
+```python
+from pydantic import Field
+
+from omniagent.db.document_models import DocumentModels
+from omniagent.persistence.backends.mongo import MongoBackendAdapter
+from omniagent.schemas.mongo import Message, Session, Summary, User
+
+
+class CustomSession(Session):
+    starred: bool = Field(default=False)
+
+    @classmethod
+    async def update_starred_by_client_id(cls, session_id: str, starred: bool, client_id: str) -> dict:
+        session = await cls.get_by_id_and_client_id(session_id, client_id)
+        if not session:
+            return {"session_updated": False, "session_id": session_id, "starred": starred}
+        session.starred = starred
+        await session.save()
+        return {"session_updated": True, "session_id": session_id, "starred": starred}
+
+
+await MongoBackendAdapter.initialize(
+    models=DocumentModels(
+        user=User,
+        session=CustomSession,
+        summary=Summary,
+        message=Message,
+    )
+)
+```
+
 ## Observability
 
 OmniAgent is instrumented with OpenTelemetry. To enable tracing:

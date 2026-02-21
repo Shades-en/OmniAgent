@@ -38,7 +38,6 @@ class Session(PublicDictMixin, Document):
     user: Link[User]
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    starred: bool = Field(default=False)
 
     class Settings:
         name = "sessions"
@@ -304,104 +303,6 @@ class Session(PublicDictMixin, Document):
             raise SessionUpdateError(
                 "Failed to update session name",
                 details=f"session_id={self.id}, new_name={new_name}, error={str(e)}"
-            )
-    
-    @classmethod
-    @trace_operation(kind=SpanKind.INTERNAL, open_inference_kind=CustomSpanKinds.DATABASE.value)
-    async def update_starred(cls, session_id: str, starred: bool, user_id: str) -> dict:
-        """
-        Update the starred status for a session.
-        
-        Args:
-            session_id: The session ID to update
-            starred: Whether the session should be starred (True) or unstarred (False)
-            user_id: The user's MongoDB document ID for authorization
-            
-        Returns:
-            Dictionary with update info: {
-                "session_updated": bool,
-                "session_id": str,
-                "starred": bool
-            }
-            
-        Raises:
-            SessionUpdateError: If update fails
-        
-        Traced as INTERNAL span for database operation.
-        """
-        try:
-            session = await cls.get_by_id(session_id, user_id)
-            
-            if not session:
-                raise SessionUpdateError(
-                    "Session not found",
-                    details=f"session_id={session_id}"
-                )
-            
-            session.starred = starred
-            await session.save()
-            
-            return {
-                "session_updated": True,
-                "session_id": session_id,
-                "starred": starred
-            }
-                    
-        except SessionUpdateError:
-            raise
-        except Exception as e:
-            raise SessionUpdateError(
-                "Failed to update session starred status",
-                details=f"session_id={session_id}, starred={starred}, error={str(e)}"
-            )
-    
-    @classmethod
-    @trace_operation(kind=SpanKind.INTERNAL, open_inference_kind=CustomSpanKinds.DATABASE.value)
-    async def update_starred_by_client_id(cls, session_id: str, starred: bool, client_id: str) -> dict:
-        """
-        Update the starred status for a session, authorized by client_id.
-        
-        Args:
-            session_id: The session ID to update
-            starred: Whether the session should be starred (True) or unstarred (False)
-            client_id: The user's client ID for authorization
-            
-        Returns:
-            Dictionary with update info: {
-                "session_updated": bool,
-                "session_id": str,
-                "starred": bool
-            }
-            
-        Raises:
-            SessionUpdateError: If update fails
-        
-        Traced as INTERNAL span for database operation.
-        """
-        try:
-            session = await cls.get_by_id_and_client_id(session_id, client_id)
-            
-            if not session:
-                raise SessionUpdateError(
-                    "Session not found",
-                    details=f"session_id={session_id}"
-                )
-            
-            session.starred = starred
-            await session.save()
-            
-            return {
-                "session_updated": True,
-                "session_id": session_id,
-                "starred": starred
-            }
-                    
-        except SessionUpdateError:
-            raise
-        except Exception as e:
-            raise SessionUpdateError(
-                "Failed to update session starred status",
-                details=f"session_id={session_id}, starred={starred}, error={str(e)}"
             )
     
     @classmethod
@@ -959,55 +860,3 @@ class Session(PublicDictMixin, Document):
                 details=f"client_id={client_id}, error={str(e)}"
             )
     
-    @classmethod
-    async def get_starred_by_user_client_id(cls, client_id: str) -> List[Session]:
-        """
-        Get all starred sessions for a user by client ID, sorted by most recently updated first.
-        Uses MongoDB aggregation with $lookup to join with users collection.
-        
-        Args:
-            client_id: The user's client ID
-            
-        Returns:
-            List of starred Session documents sorted by most recently updated first
-            
-        Raises:
-            SessionRetrievalError: If retrieval fails
-        """
-        try:
-            # Aggregation pipeline to lookup user by client_id and get starred sessions
-            pipeline = [
-                {
-                    "$lookup": {
-                        "from": "users",
-                        "localField": "user.$id",
-                        "foreignField": "_id",
-                        "as": "user_data"
-                    }
-                },
-                {
-                    "$unwind": "$user_data"
-                },
-                {
-                    "$match": {
-                        "user_data.client_id": client_id,
-                        "starred": True
-                    }
-                },
-                {
-                    "$sort": {"updated_at": -1}  # Most recently updated first
-                }
-            ]
-            
-            sessions = await cls.aggregate(pipeline).to_list()
-            
-            # Convert aggregation results back to Session documents
-            return [cls.model_validate(session) for session in sessions]
-            
-        except Exception as e:
-            raise SessionRetrievalError(
-                "Failed to retrieve starred sessions for user by client_id",
-                details=f"client_id={client_id}, error={str(e)}"
-            )
-
-        

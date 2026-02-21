@@ -57,8 +57,6 @@ _REPOSITORY_MODEL_METHOD_CONTRACTS: dict[str, dict[str, dict[str, Any]]] = {
         "get_paginated_by_user_client_id": {"required_params": ("client_id", "page", "page_size")},
         "count_by_user_client_id": {"required_params": ("client_id",)},
         "get_all_by_user_client_id": {"required_params": ("client_id",)},
-        "get_starred_by_user_client_id": {"required_params": ("client_id",)},
-        "update_starred_by_client_id": {"required_params": ("session_id", "starred", "client_id")},
         "update_name_by_client_id": {"required_params": ("session_id", "name", "client_id")},
         "delete_with_related_by_client_id": {"required_params": ("session_id", "client_id")},
         "delete_all_by_user_client_id": {"required_params": ("client_id",)},
