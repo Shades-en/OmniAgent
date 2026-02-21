@@ -4,7 +4,7 @@ MongoDB connection manager using Beanie ODM.
 
 import os
 from typing import List, Type
-from beanie import init_beanie, Document
+from beanie import init_beanie, Document, Link
 from pymongo import AsyncMongoClient
 from opentelemetry.trace import SpanKind
 
@@ -79,23 +79,29 @@ class MongoDB:
             resolved_models.message,
         ] + (extra_document_models or [])
 
-        await init_beanie(
-            database=cls._client[db_name],
-            document_models=document_models,
-            allow_index_dropping=allow_index_dropping,
-        )
-
+        # Register model mapping and resolve forward references against configured models.
         set_document_models(
             user=resolved_models.user,
             session=resolved_models.session,
             summary=resolved_models.summary,
             message=resolved_models.message,
         )
+        types_namespace = {
+            "Link": Link,
+            "User": resolved_models.user,
+            "Session": resolved_models.session,
+            "Summary": resolved_models.summary,
+            "Message": resolved_models.message,
+        }
+        resolved_models.message.model_rebuild(_types_namespace=types_namespace)
+        resolved_models.session.model_rebuild(_types_namespace=types_namespace)
+        resolved_models.summary.model_rebuild(_types_namespace=types_namespace)
 
-        # Rebuild models to resolve circular dependencies using the registered models.
-        resolved_models.message.model_rebuild(_types_namespace={"Session": resolved_models.session, "Summary": resolved_models.summary})
-        resolved_models.session.model_rebuild(_types_namespace={"Message": resolved_models.message, "Summary": resolved_models.summary})
-        resolved_models.summary.model_rebuild(_types_namespace={"Session": resolved_models.session})
+        await init_beanie(
+            database=cls._client[db_name],
+            document_models=document_models,
+            allow_index_dropping=allow_index_dropping,
+        )
         
         cls._initialized = True
     

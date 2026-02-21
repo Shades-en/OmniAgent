@@ -6,16 +6,11 @@ from bson import ObjectId
 
 from datetime import datetime, timezone
 from pydantic import Field
-from typing import List, TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, List, ClassVar
 import asyncio
 
 from opentelemetry.trace import SpanKind
 
-if TYPE_CHECKING:
-    from omniagent.schemas.mongo.message import Message
-    from omniagent.schemas.mongo.summary import Summary
-
-from omniagent.schemas.mongo.user import User
 from omniagent.types.message import MessageDTO
 from omniagent.exceptions import (
     SessionRetrievalError,
@@ -26,8 +21,17 @@ from omniagent.exceptions import (
 )
 from omniagent.config import DEFAULT_SESSION_NAME, DEFAULT_SESSION_PAGE_SIZE
 from omniagent.utils.tracing import trace_method, trace_operation, CustomSpanKinds
-from omniagent.db.document_models import get_message_model, get_summary_model
+from omniagent.db.document_models import (
+    get_message_model,
+    get_summary_model,
+    get_user_model,
+)
 from omniagent.schemas.mongo.public_dict import PublicDictMixin
+
+if TYPE_CHECKING:
+    from omniagent.schemas.mongo.message import Message
+    from omniagent.schemas.mongo.summary import Summary
+    from omniagent.schemas.mongo.user import User
 
 
 class Session(PublicDictMixin, Document):
@@ -35,7 +39,7 @@ class Session(PublicDictMixin, Document):
 
     name: str = Field(default_factory=lambda: DEFAULT_SESSION_NAME)
     latest_turn_number: int = Field(...)
-    user: Link[User]
+    user: Link["User"]
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -174,7 +178,8 @@ class Session(PublicDictMixin, Document):
             try:
                 async with await session_txn.start_transaction():
                     # Create new user
-                    new_user = User(client_id=client_id)
+                    UserModel = get_user_model()
+                    new_user = UserModel(client_id=client_id)
                     await new_user.insert(session=session_txn)
                     
                     # Create and save session with provided session_id
@@ -198,7 +203,7 @@ class Session(PublicDictMixin, Document):
     @classmethod
     async def create_for_existing_user(
         cls,
-        user: User,
+        user: "User",
         session_id: str,
         session_name: str = DEFAULT_SESSION_NAME
     ) -> Session:
@@ -444,7 +449,8 @@ class Session(PublicDictMixin, Document):
             summary_model = get_summary_model()
             
             # Get user by client_id first
-            user = await User.get_by_client_id(client_id)
+            UserModel = get_user_model()
+            user = await UserModel.get_by_client_id(client_id)
             if not user:
                 return {
                     "sessions_deleted": 0,
@@ -627,8 +633,8 @@ class Session(PublicDictMixin, Document):
         self, 
         messages: List[MessageDTO],
         turn_number: int,
-        previous_summary: Summary,
-    ) -> List[Message]:
+        previous_summary: "Summary | None",
+    ) -> List["Message"]:
         """
         Bulk insert messages for this session with turn information.
         

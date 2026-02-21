@@ -12,15 +12,15 @@ from pydantic import model_validator
 
 from omniagent.utils.tracing import trace_method
 
-if TYPE_CHECKING:
-    from omniagent.schemas.mongo.session import Session
-
 from omniagent.exceptions import (
     SummaryRetrievalError,
     SummaryCreationError,
 )
 from omniagent.utils.general import get_token_count
 from omniagent.schemas.mongo.public_dict import PublicDictMixin
+
+if TYPE_CHECKING:
+    from omniagent.schemas.mongo.session import Session
 
 class Summary(PublicDictMixin, Document):
     PUBLIC_EXCLUDE: ClassVar[set[str]] = {"session"}
@@ -29,7 +29,7 @@ class Summary(PublicDictMixin, Document):
     token_count: int = Field(default=0)
     start_turn_number: int
     end_turn_number: int
-    session: Link[Session] | None = None
+    session: Link["Session"] | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     @model_validator(mode="after")
@@ -68,7 +68,7 @@ class Summary(PublicDictMixin, Document):
         capture_input=False,
         capture_output=False
     )
-    async def create_with_session(cls, session: Session, summary: Summary) -> Summary:
+    async def create_with_session(cls, session: "Session", summary: "Summary") -> "Summary":
         """Create a new summary for a session."""
         try:
             summary.session = session

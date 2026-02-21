@@ -9,9 +9,13 @@ import logging
 
 from omniagent.session.base import SessionManager
 from omniagent.types.message import MessageDTO
-from omniagent.db.document_models import get_message_model, get_summary_model
-from omniagent.schemas.mongo import User, Session, Summary
-from omniagent.domain_protocols import MessageProtocol
+from omniagent.db.document_models import (
+    get_message_model,
+    get_summary_model,
+    get_session_model,
+    get_user_model,
+)
+from omniagent.domain_protocols import MessageProtocol, SummaryProtocol
 from omniagent.config import MAX_TURNS_TO_FETCH, LLM_PROVIDER
 from omniagent.utils.tracing import trace_method, CustomSpanKinds
 
@@ -62,7 +66,12 @@ class MongoSessionManager(SessionManager):
                 max_chat_name_words=max_chat_name_words,
             )
 
-        session = await Session.get_by_id_and_client_id(session_id=session_id, client_id=client_id) if client_id else None
+        SessionModel = get_session_model()
+        session = (
+            await SessionModel.get_by_id_and_client_id(session_id=session_id, client_id=client_id)
+            if client_id
+            else None
+        )
         if session is None:
             return await llm_provider.generate_chat_name(
                 query=query,
@@ -110,9 +119,11 @@ class MongoSessionManager(SessionManager):
         If user found but session not found: creates session for existing user.
         """
         # Fetch user and session in parallel
-        user_task = User.get_by_client_id(self.user_client_id)
+        UserModel = get_user_model()
+        SessionModel = get_session_model()
+        user_task = UserModel.get_by_client_id(self.user_client_id)
         session_task = (
-            Session.get_by_id_and_client_id(self.session_id, self.user_client_id)
+            SessionModel.get_by_id_and_client_id(self.session_id, self.user_client_id)
             if self.session_id
             else asyncio.coroutine(lambda: None)()
         )
@@ -123,7 +134,7 @@ class MongoSessionManager(SessionManager):
         if not self.user:
             self.new_user = True
             self.new_chat = True
-            self.session = await Session.create_with_user(
+            self.session = await SessionModel.create_with_user(
                 client_id=self.user_client_id,
                 session_id=self.session_id,
             )
@@ -132,7 +143,7 @@ class MongoSessionManager(SessionManager):
         # Case 2: User found but session not found - create session for existing user
         if not self.session:
             self.new_chat = True
-            self.session = await Session.create_for_existing_user(
+            self.session = await SessionModel.create_for_existing_user(
                 user=self.user,
                 session_id=self.session_id,
             )
@@ -143,7 +154,7 @@ class MongoSessionManager(SessionManager):
         capture_input=False,
         capture_output=False
     )
-    async def _fetch_context(self) -> Tuple[List[MessageProtocol], Summary | None]:
+    async def _fetch_context(self) -> Tuple[List[MessageProtocol], SummaryProtocol | None]:
         """
         Fetch the latest N turns (as messages) and the latest summary in parallel.
         
@@ -185,7 +196,7 @@ class MongoSessionManager(SessionManager):
     async def update_user_session(
         self, 
         messages: List[MessageDTO], 
-        summary: Summary | None, 
+        summary: SummaryProtocol | None, 
         regenerated_summary: bool,
         on_stream_event: StreamCallback | None = None,
     ) -> List[MessageDTO]:

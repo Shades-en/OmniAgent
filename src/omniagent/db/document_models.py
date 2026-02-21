@@ -34,3 +34,11 @@ def get_message_model() -> Type[Document]:
 
 def get_summary_model() -> Type[Document]:
     return get_document_models().summary
+
+
+def get_user_model() -> Type[Document]:
+    return get_document_models().user
+
+
+def get_session_model() -> Type[Document]:
+    return get_document_models().session

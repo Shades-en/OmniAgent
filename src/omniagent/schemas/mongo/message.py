@@ -32,9 +32,9 @@ class Message(PublicDictMixin, Document):
     metadata: dict = Field(default_factory=dict)
     parts: list[MessageHumanTextPart | MessageAITextPart | MessageReasoningPart | MessageToolPart] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    previous_summary: Link[Summary] | None = None
+    previous_summary: Link["Summary"] | None = None
     turn_number: int = 1
-    session: Link[Session]
+    session: Link["Session"]
     client_message_id: str | None = Field(default=None, description="Frontend-generated message ID (e.g., from AI SDK)")
 
     class Settings:
