@@ -24,7 +24,7 @@ def set_document_models(*, user: Type[Document], session: Type[Document], summar
 
 def get_document_models() -> DocumentModels:
     if _DOCUMENT_MODELS is None:
-        raise RuntimeError("Document models not configured. Call MongoSessionManager.initialize() first.")
+        raise RuntimeError("Document models not configured. Call MongoBackendAdapter.initialize() first.")
     return _DOCUMENT_MODELS
 
 
@@ -34,4 +34,3 @@ def get_message_model() -> Type[Document]:
 
 def get_summary_model() -> Type[Document]:
     return get_document_models().summary
-

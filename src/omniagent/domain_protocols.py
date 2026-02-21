@@ -21,6 +21,7 @@ class UserProtocol(Protocol):
 @runtime_checkable
 class SummaryProtocol(Protocol):
     """Protocol for Summary objects."""
+    content: str
     end_turn_number: int
 
 

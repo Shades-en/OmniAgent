@@ -1,15 +1,11 @@
 """
 Schema module for OmniAgent.
 
-Re-exports MongoDB schemas for backward compatibility.
+Use explicit backend namespaces for schema imports, for example:
+- `omniagent.schemas.mongo.Session`
+- `omniagent.schemas.mongo.User`
+
+Top-level schema aliases are intentionally not exported.
 """
 
-from omniagent.schemas.mongo import User, UserType, Session, Summary, Message
-
-__all__ = [
-    "User",
-    "UserType",
-    "Session",
-    "Summary",
-    "Message",
-]
+__all__: list[str] = []

@@ -8,15 +8,15 @@ from typing import List, Tuple
 import logging
 
 from omniagent.session.base import SessionManager
-from omniagent.ai.providers import get_llm_provider
 from omniagent.types.message import MessageDTO
-from omniagent.db.document_models import DocumentModels, get_message_model, get_summary_model
+from omniagent.db.document_models import get_message_model, get_summary_model
 from omniagent.schemas.mongo import User, Session, Summary
-from omniagent.protocols import MessageProtocol
+from omniagent.domain_protocols import MessageProtocol
 from omniagent.config import MAX_TURNS_TO_FETCH, LLM_PROVIDER
 from omniagent.utils.tracing import trace_method, CustomSpanKinds
+
+from omniagent.ai.providers import get_llm_provider
 from omniagent.ai.providers.utils import StreamCallback, stream_fallback_response
-from omniagent.db.mongo import MongoDB
 
 logger = logging.getLogger(__name__)
 
@@ -28,51 +28,6 @@ class MongoSessionManager(SessionManager):
     Implements database operations for fetching and persisting user sessions,
     messages, and summaries in MongoDB.
     """
-
-    @classmethod
-    async def initialize(
-        cls,
-        db_name: str | None = None,
-        srv_uri: str | None = None,
-        allow_index_dropping: bool = False,
-        models: DocumentModels | None = None,
-        extra_document_models=None,
-    ) -> None:
-        """
-        Initialize MongoDB connection and register Beanie document models.
-        
-        This should be called once during application startup (e.g., FastAPI lifespan).
-        
-        Args:
-            db_name: Database name (defaults to MONGO_DB_NAME env var)
-            srv_uri: Full MongoDB SRV URI (defaults to MONGO_SRV_URI env var)
-            allow_index_dropping: Whether to allow dropping indexes on init
-        
-        Example:
-            ```python
-            @asynccontextmanager
-            async def lifespan(app: FastAPI):
-                await MongoSessionManager.initialize()
-                yield
-                await MongoSessionManager.shutdown()
-            ```
-        """
-        await MongoDB.init(
-            db_name=db_name,
-            srv_uri=srv_uri,
-            allow_index_dropping=allow_index_dropping,
-            models=models,
-            extra_document_models=extra_document_models,
-        )
-
-    @classmethod
-    async def shutdown(cls) -> None:
-        """
-        Close MongoDB connection gracefully.
-        
-        This should be called during application shutdown (e.g., FastAPI lifespan).
-        """
-        await MongoDB.close()
 
     @classmethod
     async def generate_chat_name(

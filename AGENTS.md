@@ -44,6 +44,7 @@
 - Use typed exceptions from `omniagent.exceptions`; avoid leaking raw low-level exceptions.
 - Keep async paths non-blocking and cancellation-safe, especially around streaming and DB writes.
 - Maintain response/schema compatibility for public methods returning message/session payloads.
+- Whenever changing schemas, document models, or repository methods/contracts, update corresponding protocol definitions and `src/omniagent/persistence/model_contracts.py` in the same change.
 
 ## Tracing, Streaming, And Session Safety
 - Keep tracing instrumentation intact (`instrument`, tracing decorators, context propagation).
@@ -64,3 +65,6 @@
 - Do not bypass exception typing/handling boundaries with generic catch-all logic unless justified.
 - Do not break SSE/streaming protocol compatibility unintentionally.
 - Do not remove tracing or cancellation cleanup paths in runner/session flows.
+
+## Current Architecture Decisions
+- Do not prioritize backward compatibility unless the user explicitly asks for it.

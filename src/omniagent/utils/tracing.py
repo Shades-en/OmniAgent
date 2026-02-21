@@ -150,7 +150,7 @@ async def trace_context(
         query: User's input query/message
         session_id: MongoDB session ID
         user_client_id: Consumer-provided user identifier (e.g., cookie, auth subject)
-    
+
     Usage:
         >>> async with trace_context(
         ...     query="What's the weather?",

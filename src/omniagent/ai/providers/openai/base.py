@@ -24,7 +24,7 @@ from omniagent.ai.providers.utils import (
 from omniagent.utils.general import get_token_count
 from omniagent.utils.tracing import trace_method
 
-from omniagent.protocols import SummaryProtocol as Summary
+from omniagent.domain_protocols import SummaryProtocol as Summary
 from omniagent.types.message import (
     MessageDTO, 
     MessageHumanTextPart, 

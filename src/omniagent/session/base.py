@@ -10,7 +10,7 @@ import logging
 
 from omniagent.types.state import State
 from omniagent.types.message import MessageDTO
-from omniagent.protocols import UserProtocol, SessionProtocol, MessageProtocol, SummaryProtocol
+from omniagent.domain_protocols import UserProtocol, SessionProtocol, MessageProtocol, SummaryProtocol
 from omniagent.config import MAX_TOKEN_THRESHOLD
 from omniagent.utils.general import generate_id
 from omniagent.config import AISDK_ID_LENGTH
@@ -27,31 +27,6 @@ class SessionManager(ABC):
     Provides common logic for state management and context orchestration.
     Subclasses must implement database-specific methods for fetching and persisting data.
     """
-    
-    @classmethod
-    @abstractmethod
-    async def initialize(cls, **kwargs) -> None:
-        """
-        Initialize the database connection and schemas.
-        
-        This should be called once during application startup (e.g., FastAPI lifespan).
-        Subclasses must implement this to set up their specific database backend.
-        
-        Args:
-            **kwargs: Database-specific configuration options
-        """
-        ...
-
-    @classmethod
-    @abstractmethod
-    async def shutdown(cls) -> None:
-        """
-        Close the database connection gracefully.
-        
-        This should be called during application shutdown (e.g., FastAPI lifespan).
-        Subclasses must implement this to clean up their specific database backend.
-        """
-        ...
 
     def __init__(
         self, 
@@ -140,7 +115,6 @@ class SessionManager(ABC):
                 
                 # Track state change in current span
                 track_state_change(key, old_value, value)
-
 
     async def get_context_and_update_state(self) -> Tuple[List[MessageDTO], SummaryProtocol | None]:
         """

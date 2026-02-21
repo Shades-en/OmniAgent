@@ -13,8 +13,9 @@ from omniagent.exceptions import (
     MessageRetrievalError,
     MaxStepsReachedError,
 )
+from omniagent.domain_protocols import SummaryProtocol
+from omniagent.db.document_models import get_summary_model
 from omniagent.types.message import MessageDTO
-from omniagent.schemas import Summary
 from omniagent.session import SessionManager
 from omniagent.utils.tracing import trace_method
 from omniagent.utils.general import generate_id
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 class QueryResult:
     """Result of handling a query with messages, summary, and fallback status."""
     messages: List[MessageDTO]
-    summary: Summary | None
+    summary: SummaryProtocol | None
     fallback: bool
     regenerated_summary: bool
 
@@ -62,11 +63,11 @@ class Runner:
         conversation_history: List[MessageDTO],
         previous_conversation: List[MessageDTO],
         ai_message: List[MessageDTO],
-        summary: Summary | None,
+        summary: SummaryProtocol | None,
         query: str,
         tool_call: bool,
         on_stream_event: StreamCallback | None = None,
-    ) -> tuple[bool, Summary | None]:
+    ) -> tuple[bool, SummaryProtocol | None]:
         """
         Generate LLM response and summary in parallel.
         
@@ -137,8 +138,8 @@ class Runner:
 
         conversation_history: List[MessageDTO] = []
         previous_conversation: List[MessageDTO] = []
-        summary: Summary | None = None
-        new_summary: Summary | None = None
+        summary: SummaryProtocol | None = None
+        new_summary: SummaryProtocol | None = None
 
         user_query_message = MessageDTO.create_human_message(text=query, message_id=query_id)
         message_id = generate_id(AISDK_ID_LENGTH, "nanoid")
@@ -223,7 +224,8 @@ class Runner:
             # Try to get summary: use existing, fetch from DB, or None
             previous_summary = summary
             if not previous_summary and self.session_manager.session:
-                previous_summary = await Summary.get_latest_by_session(
+                SummaryModel = get_summary_model()
+                previous_summary = await SummaryModel.get_latest_by_session(
                     session_id=str(self.session_manager.session.id)
                 )
             

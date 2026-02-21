@@ -33,17 +33,17 @@ pip install -e .
 ### 1. Initialize the Database
 
 ```python
-from omniagent.session import MongoSessionManager
+from omniagent.persistence.backends.mongo import MongoBackendAdapter
 
 # In your FastAPI lifespan or startup
 async def startup():
-    await MongoSessionManager.initialize(
+    await MongoBackendAdapter.initialize(
         db_name="your_db",
         srv_uri="mongodb+srv://..."
     )
 
 async def shutdown():
-    await MongoSessionManager.shutdown()
+    await MongoBackendAdapter.shutdown()
 ```
 
 ### 2. Create a Session Manager
@@ -52,11 +52,8 @@ async def shutdown():
 from omniagent.session import MongoSessionManager
 
 session_manager = MongoSessionManager(
-    user_id="user_123",
     session_id="session_456",
-    user_cookie="cookie_abc",
-    new_chat=False,
-    new_user=False,
+    user_client_id="client_abc",
 )
 ```
 
@@ -134,7 +131,15 @@ Set these environment variables:
 | `MONGO_DB_NAME` | Database name |
 | `OPENAI_API_KEY` | OpenAI API key |
 
-Or pass them directly to `MongoSessionManager.initialize()`.
+Or pass them directly to `MongoBackendAdapter.initialize()`.
+
+## Schema Imports
+
+Use explicit backend namespaces for schema imports.
+
+```python
+from omniagent.schemas.mongo import Session, User, Message, Summary
+```
 
 ## Observability
 
