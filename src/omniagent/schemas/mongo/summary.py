@@ -42,7 +42,7 @@ class Summary(PublicDictMixin, Document):
     class Settings:
         name = "summaries"
         indexes = [
-            [("session._id", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)]
+            [("session.$id", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)]
         ]
     
     @classmethod
@@ -53,7 +53,7 @@ class Summary(PublicDictMixin, Document):
         
         try:
             return await cls.find(
-                cls.session._id == ObjectId(session_id)
+                cls.session.id == ObjectId(session_id)
             ).sort(-cls.created_at).first_or_none()
         except Exception as e:
             raise SummaryRetrievalError(

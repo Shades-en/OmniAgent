@@ -213,13 +213,23 @@ class User(PublicDictMixin, Document):
                     if cascade:
                         MessageModel = get_message_model()
                         SummaryModel = get_summary_model()
+                        sessions = await Session.find(Session.user.id == user.id).to_list()
+                        session_ids = [session.id for session in sessions if session.id is not None]
                         # Delete user, sessions, and their related data in parallel
-                        delete_results = await asyncio.gather(
-                            user.delete(session=session_txn),
-                            MessageModel.find({"session.user.$id": user.id}).delete(session=session_txn),
-                            SummaryModel.find({"session.user.$id": user.id}).delete(session=session_txn),
-                            Session.find(Session.user.id == user.id).delete(session=session_txn)
-                        )
+                        if session_ids:
+                            delete_results = await asyncio.gather(
+                                user.delete(session=session_txn),
+                                MessageModel.find({"session.$id": {"$in": session_ids}}).delete(session=session_txn),
+                                SummaryModel.find({"session.$id": {"$in": session_ids}}).delete(session=session_txn),
+                                Session.find(Session.user.id == user.id).delete(session=session_txn)
+                            )
+                        else:
+                            delete_results = await asyncio.gather(
+                                user.delete(session=session_txn),
+                                asyncio.sleep(0, result=None),
+                                asyncio.sleep(0, result=None),
+                                Session.find(Session.user.id == user.id).delete(session=session_txn)
+                            )
                         
                         messages_deleted = delete_results[1].deleted_count if delete_results[1] else 0
                         summaries_deleted = delete_results[2].deleted_count if delete_results[2] else 0

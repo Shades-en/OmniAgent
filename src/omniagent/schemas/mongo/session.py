@@ -402,8 +402,8 @@ class Session(PublicDictMixin, Document):
                 async with await session_txn.start_transaction():
                     delete_results = await asyncio.gather(
                         session.delete(session=session_txn),
-                        message_model.find(message_model.session._id == session_obj_id).delete(session=session_txn),
-                        summary_model.find(summary_model.session._id == session_obj_id).delete(session=session_txn)
+                        message_model.find(message_model.session.id == session_obj_id).delete(session=session_txn),
+                        summary_model.find(summary_model.session.id == session_obj_id).delete(session=session_txn)
                     )
                     
                     messages_deleted = delete_results[1].deleted_count if delete_results[1] else 0
@@ -468,16 +468,25 @@ class Session(PublicDictMixin, Document):
                     "messages_deleted": 0,
                     "summaries_deleted": 0
                 }
+
+            session_ids = [session.id for session in sessions if session.id is not None]
             
             client = MongoDB.get_client()
             
             async with client.start_session() as session_txn:
                 async with await session_txn.start_transaction():
-                    delete_results = await asyncio.gather(
-                        cls.find(cls.user.id == user_obj_id).delete(session=session_txn),
-                        message_model.find({"session.user.$id": user_obj_id}).delete(session=session_txn),
-                        summary_model.find({"session.user.$id": user_obj_id}).delete(session=session_txn)
-                    )
+                    if session_ids:
+                        delete_results = await asyncio.gather(
+                            cls.find(cls.user.id == user_obj_id).delete(session=session_txn),
+                            message_model.find({"session.$id": {"$in": session_ids}}).delete(session=session_txn),
+                            summary_model.find({"session.$id": {"$in": session_ids}}).delete(session=session_txn)
+                        )
+                    else:
+                        delete_results = await asyncio.gather(
+                            cls.find(cls.user.id == user_obj_id).delete(session=session_txn),
+                            asyncio.sleep(0, result=None),
+                            asyncio.sleep(0, result=None),
+                        )
                     
                     sessions_deleted = delete_results[0].deleted_count if delete_results[0] else 0
                     messages_deleted = delete_results[1].deleted_count if delete_results[1] else 0
@@ -531,17 +540,26 @@ class Session(PublicDictMixin, Document):
                     "messages_deleted": 0,
                     "summaries_deleted": 0
                 }
+
+            session_ids = [session.id for session in sessions if session.id is not None]
             
             client = MongoDB.get_client()
             
             async with client.start_session() as session_txn:
                 async with await session_txn.start_transaction():
-                    # Delete all sessions, messages, and summaries in parallel
-                    delete_results = await asyncio.gather(
-                        cls.find(cls.user.id == obj_id).delete(session=session_txn),
-                        MessageModel.find({"session.user.$id": obj_id}).delete(session=session_txn),
-                        SummaryModel.find({"session.user.$id": obj_id}).delete(session=session_txn)
-                    )
+                    if session_ids:
+                        # Delete all sessions, messages, and summaries in parallel.
+                        delete_results = await asyncio.gather(
+                            cls.find(cls.user.id == obj_id).delete(session=session_txn),
+                            MessageModel.find({"session.$id": {"$in": session_ids}}).delete(session=session_txn),
+                            SummaryModel.find({"session.$id": {"$in": session_ids}}).delete(session=session_txn)
+                        )
+                    else:
+                        delete_results = await asyncio.gather(
+                            cls.find(cls.user.id == obj_id).delete(session=session_txn),
+                            asyncio.sleep(0, result=None),
+                            asyncio.sleep(0, result=None),
+                        )
                     
                     sessions_deleted = delete_results[0].deleted_count if delete_results[0] else 0
                     messages_deleted = delete_results[1].deleted_count if delete_results[1] else 0
@@ -604,8 +622,8 @@ class Session(PublicDictMixin, Document):
                     # Delete session, messages, and summaries in parallel
                     delete_results = await asyncio.gather(
                         session.delete(session=session_txn),
-                        MessageModel.find(MessageModel.session._id == session_obj_id).delete(session=session_txn),
-                        SummaryModel.find(SummaryModel.session._id == session_obj_id).delete(session=session_txn)
+                        MessageModel.find(MessageModel.session.id == session_obj_id).delete(session=session_txn),
+                        SummaryModel.find(SummaryModel.session.id == session_obj_id).delete(session=session_txn)
                     )
                     
                     messages_deleted = delete_results[1].deleted_count if delete_results[1] else 0

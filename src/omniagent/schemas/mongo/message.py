@@ -43,13 +43,13 @@ class Message(PublicDictMixin, Document):
             # For chronological queries and pagination with role ordering
             # Ascending role ('assistant' < 'user'), reversed in code to get user first
             [
-                ("session._id", pymongo.ASCENDING), 
+                ("session.$id", pymongo.ASCENDING),
                 ("created_at", pymongo.DESCENDING),
                 ("role", pymongo.ASCENDING),  # 'assistant' < 'user' alphabetically
             ],
             # For turn-based range queries (get_latest_by_session)
             [
-                ("session._id", pymongo.ASCENDING),
+                ("session.$id", pymongo.ASCENDING),
                 ("turn_number", pymongo.ASCENDING),
                 ("created_at", pymongo.ASCENDING),
             ]
@@ -132,9 +132,9 @@ class Message(PublicDictMixin, Document):
             
             # First, get messages sorted by most recent (descending)
             # When created_at is the same, user messages come before assistant messages
-            # Use cls.session._id for querying Link fields
+            # Use DBRef session id for querying Link fields.
             messages = await cls.find(
-                cls.session._id == ObjectId(session_id)
+                cls.session.id == ObjectId(session_id)
             ).sort(
                 -cls.created_at,  # Descending to get most recent
                 +cls.role,  # Ascending: 'assistant' < 'user', reversed later to get user first
@@ -166,7 +166,7 @@ class Message(PublicDictMixin, Document):
         """
         try:
             count = await cls.find(
-                cls.session._id == ObjectId(session_id)
+                cls.session.id == ObjectId(session_id)
             ).count()
             
             return count
@@ -191,9 +191,9 @@ class Message(PublicDictMixin, Document):
             MessageRetrievalError: If retrieval fails
         """
         try:
-            # Use cls.session._id for querying Link fields
+            # Use DBRef session id for querying Link fields.
             messages = await cls.find(
-                cls.session._id == ObjectId(session_id)
+                cls.session.id == ObjectId(session_id)
             ).sort(
                 +cls.created_at,  # Ascending order (oldest first)
                 -cls.role,  # Descending: 'user' > 'assistant' alphabetically, user comes first
@@ -244,7 +244,7 @@ class Message(PublicDictMixin, Document):
             # Ex: turn_number >= 6 is true for turns 6 to 105 (105 turns are in DB currently)
             # 105 - 6 + 1 = 100 turns are fetched
             messages = await cls.find(
-                cls.session._id == ObjectId(session_id),
+                cls.session.id == ObjectId(session_id),
                 cls.turn_number >= min_turn_number
             ).sort(
                 +cls.created_at,  # Ascending order (oldest first)
@@ -285,7 +285,7 @@ class Message(PublicDictMixin, Document):
                 {
                     "$lookup": {
                         "from": "sessions",
-                        "localField": "session._id",
+                        "localField": "session.$id",
                         "foreignField": "_id",
                         "as": "session_data"
                     }
