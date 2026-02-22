@@ -1,9 +1,6 @@
 from openinference.semconv.trace import SpanAttributes
-from openinference.instrumentation.openai import OpenAIInstrumentor
-from openinference.instrumentation.langchain import LangChainInstrumentor
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
-from opentelemetry.instrumentation.pymongo import PymongoInstrumentor
 
 from functools import wraps
 from contextvars import ContextVar
@@ -31,9 +28,7 @@ _is_instrumented = False
 
 def instrument(tracer_provider: Any) -> bool:
     """
-    Instrument supported libraries with the provided tracer provider.
-    
-    Instruments: OpenAI, Pymongo, Redis, LangChain.
+    Mark OmniAgent tracing instrumentation as initialized.
     
     Args:
         tracer_provider: The OpenTelemetry tracer provider to use for instrumentation.
@@ -48,11 +43,7 @@ def instrument(tracer_provider: Any) -> bool:
     
     if tracer_provider is None:
         return False
-    
-    OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
-    PymongoInstrumentor().instrument(tracer_provider=tracer_provider)
-    LangChainInstrumentor().instrument(tracer_provider=tracer_provider)
-    
+
     _is_instrumented = True
     return True
 
