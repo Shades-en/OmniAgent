@@ -10,7 +10,7 @@ from pydantic import Field
 from typing import TYPE_CHECKING, Self, ClassVar
 from pydantic import model_validator
 
-from omniagent.utils.tracing import trace_method
+from omniagent.tracing import trace_method
 
 from omniagent.exceptions import (
     SummaryRetrievalError,

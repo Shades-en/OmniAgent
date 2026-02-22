@@ -13,7 +13,7 @@
   - Provider abstraction (`ai/providers/*`)
   - Mongo-backed session/state persistence (`session/*`, `schemas/mongo/*`, `db/*`)
   - Streaming + cancellation helpers (`utils/streaming.py`, `utils/task_registry.py`)
-  - OpenTelemetry/OpenInference tracing (`utils/tracing.py`)
+  - OpenTelemetry/OpenInference tracing (`tracing/*`)
 
 ## Setup Commands
 - Check uv exists: `uv --version`
@@ -36,7 +36,7 @@
 - `src/omniagent/config.py`: runtime config values from env.
 - `src/omniagent/constants.py`: reusable protocol/provider/streaming constants.
 - `src/omniagent/exceptions/`: typed exception hierarchy.
-- `src/omniagent/utils/tracing.py`: instrumentation and tracing decorators.
+- `src/omniagent/tracing/`: tracing runtime state, context, decorators, graph helpers, and instrumentation support.
 
 ## Implementation Rules
 - Keep orchestration logic in runtime/session/provider layers, not in ad-hoc helpers.
@@ -45,9 +45,10 @@
 - Keep async paths non-blocking and cancellation-safe, especially around streaming and DB writes.
 - Maintain response/schema compatibility for public methods returning message/session payloads.
 - Whenever changing schemas, document models, or repository methods/contracts, update corresponding protocol definitions and `src/omniagent/persistence/model_contracts.py` in the same change.
+- Hard rule: do not keep duplicate module surfaces or compatibility shims after architectural moves. When a module is moved/renamed, update all imports and remove the old module in the same change unless the user explicitly requests backward compatibility.
 
 ## Tracing, Streaming, And Session Safety
-- Keep tracing instrumentation intact (`instrument`, tracing decorators, context propagation).
+- Keep tracing instrumentation intact (`OmniAgentInstrumentor`, tracing decorators, context propagation).
 - Preserve streaming protocol/event compatibility; do not change event names/payload shape without explicit approval.
 - Ensure streaming cancellation behavior remains correct (task register/unregister and cleanup).
 - Keep session ownership/state transitions consistent when updating messages, summaries, and sessions.

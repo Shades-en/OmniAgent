@@ -29,7 +29,7 @@ from omniagent.constants import (
     OPENAI_EVENT_FAILED,
 )
 
-from omniagent.utils.tracing import trace_method
+from omniagent.tracing import trace_method
 
 from omniagent.exceptions import UnrecognizedMessageTypeError, MessageParseError
 

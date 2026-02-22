@@ -32,7 +32,7 @@ from omniagent.utils.task_registry import (
     unregister_task,
 )
 
-from omniagent.utils.tracing import (
+from omniagent.tracing import (
     trace_context,
     set_trace_context,
     get_trace_context,

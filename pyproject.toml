@@ -24,6 +24,7 @@ dependencies = [
     "langchain-openai>=0.3.29",
     "openai>=1.99.1",
     "opentelemetry-exporter-otlp>=1.37.0",
+    "opentelemetry-instrumentation>=0.58b0",
     "tiktoken>=0.11.0",
 ]
 
@@ -35,6 +36,9 @@ dev = [
 
 [project.urls]
 repository = "https://github.com/Shades-en/OmniAgent"
+
+[project.entry-points.opentelemetry_instrumentor]
+omniagent = "omniagent.tracing.instrumentation:OmniAgentInstrumentor"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/omniagent"]

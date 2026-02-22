@@ -17,7 +17,7 @@ from omniagent.db.document_models import (
 )
 from omniagent.domain_protocols import MessageProtocol, SummaryProtocol
 from omniagent.config import MAX_TURNS_TO_FETCH, LLM_PROVIDER
-from omniagent.utils.tracing import trace_method, CustomSpanKinds
+from omniagent.tracing import trace_method, CustomSpanKinds
 
 from omniagent.ai.providers import get_llm_provider
 from omniagent.ai.providers.utils import StreamCallback, stream_fallback_response

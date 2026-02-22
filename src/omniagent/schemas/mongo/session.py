@@ -20,7 +20,7 @@ from omniagent.exceptions import (
     MessageCreationError,
 )
 from omniagent.config import DEFAULT_SESSION_NAME, DEFAULT_SESSION_PAGE_SIZE
-from omniagent.utils.tracing import trace_method, trace_operation, CustomSpanKinds
+from omniagent.tracing import trace_method, trace_operation, CustomSpanKinds
 from omniagent.db.document_models import (
     get_message_model,
     get_summary_model,
@@ -683,7 +683,6 @@ class Session(PublicDictMixin, Document):
 
             # Insert messages using Beanie with transaction - shield from cancellation
             from omniagent.db import MongoDB
-
             async def _do_insert():
                 client = MongoDB.get_client()
                 async with client.start_session() as session_txn:
@@ -692,7 +691,6 @@ class Session(PublicDictMixin, Document):
                         await self._update_latest_turn_number(turn_number, session=session_txn)
             
             await _do_insert()
-            
             return message_docs
             
         except Exception as e:

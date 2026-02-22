@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from opentelemetry.trace import SpanKind
 
-from omniagent.utils.tracing import trace_operation, CustomSpanKinds
+from omniagent.tracing import trace_operation, CustomSpanKinds
 from omniagent.exceptions import (
     MessageRetrievalError,
     MessageDeletionError,

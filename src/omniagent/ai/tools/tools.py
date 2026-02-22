@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from omniagent.utils.tracing import trace_method
+from omniagent.tracing import trace_method
 from omniagent.types.tools import ToolArguments
 
 

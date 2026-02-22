@@ -12,7 +12,7 @@ from omniagent.ai.providers.utils import (
 from omniagent.ai.tools.tools import Tool
 from omniagent.types.message import MessageDTO, Role, MessageAITextPart, MessageToolPart, ToolPartState
 from omniagent.config import BASE_MODEL
-from omniagent.utils.tracing import trace_method
+from omniagent.tracing import trace_method
 from omniagent.exceptions import MessageParseError
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues

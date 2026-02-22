@@ -17,7 +17,7 @@ from omniagent.domain_protocols import SummaryProtocol
 from omniagent.db.document_models import get_summary_model
 from omniagent.types.message import MessageDTO
 from omniagent.session import SessionManager
-from omniagent.utils.tracing import trace_method
+from omniagent.tracing import trace_method
 from omniagent.utils.general import generate_id
 from omniagent.config import AISDK_ID_LENGTH
 from omniagent.ai.providers.utils import stream_fallback_response, dispatch_stream_event, create_finish_event

@@ -22,7 +22,7 @@ from omniagent.ai.providers.utils import (
     dispatch_stream_event,
 )
 from omniagent.utils.general import get_token_count
-from omniagent.utils.tracing import trace_method
+from omniagent.tracing import trace_method
 
 from omniagent.domain_protocols import SummaryProtocol as Summary
 from omniagent.types.message import (

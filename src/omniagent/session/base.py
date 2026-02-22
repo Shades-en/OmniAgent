@@ -14,7 +14,7 @@ from omniagent.domain_protocols import UserProtocol, SessionProtocol, MessagePro
 from omniagent.config import MAX_TOKEN_THRESHOLD
 from omniagent.utils.general import generate_id
 from omniagent.config import AISDK_ID_LENGTH
-from omniagent.utils.tracing import track_state_change
+from omniagent.tracing import track_state_change
 from omniagent.ai.providers.utils import StreamCallback
 
 logger = logging.getLogger(__name__)

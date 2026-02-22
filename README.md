@@ -182,14 +182,17 @@ await MongoBackendAdapter.initialize(
 OmniAgent is instrumented with OpenTelemetry. To enable tracing:
 
 ```python
-from omniagent.utils.tracing import instrument
+from omniagent import OmniAgentInstrumentor
 
 # Your tracer provider (you own this)
 tracer_provider = TracerProvider(...)
 
-# Instrument omniagent
-instrument(tracer_provider)
+# Instrument OmniAgent runtime spans
+OmniAgentInstrumentor().instrument(tracer_provider=tracer_provider)
 ```
+
+`OmniAgentInstrumentor` configures OmniAgent spans only. OpenAI/PyMongo/LangChain
+instrumentation remains consumer-owned and can be enabled separately.
 
 ## Roadmap
 

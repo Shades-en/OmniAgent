@@ -10,7 +10,7 @@ from opentelemetry.trace import SpanKind
 
 from omniagent.db.document_models import DocumentModels, set_document_models
 from omniagent.schemas.mongo import User, Session, Summary, Message
-from omniagent.utils.tracing import trace_operation, CustomSpanKinds
+from omniagent.tracing import trace_operation, CustomSpanKinds
 
 # Default typed model mapping
 DEFAULT_MODELS = DocumentModels(user=User, session=Session, summary=Summary, message=Message)
