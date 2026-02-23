@@ -130,8 +130,55 @@ Set these environment variables:
 | `MONGO_SRV_URI` | MongoDB connection string |
 | `MONGO_DB_NAME` | Database name |
 | `OPENAI_API_KEY` | OpenAI API key |
+| `LLM_PROVIDER` | Default LLM provider |
+| `LLM_API_TYPE` | Default API type (`responses` or `chat_completion`) |
+| `LLM_MODEL_PROVIDER_INFERENCE_MAP` | JSON map for model-string -> provider inference |
+| `LLM_PROVIDER_DEFAULT_API_TYPE_MAP` | JSON map for provider -> default API type |
+| `CHAT_NAME_LLM_PROVIDER` | Provider used by chat-name generation |
+| `CHAT_NAME_LLM_API_TYPE` | API type used by chat-name generation |
+| `CHAT_NAME_MODEL` | Model used by chat-name generation |
+| `CHAT_NAME_TEMPERATURE` | Temperature used by chat-name generation |
+| `CHAT_NAME_REQUEST_KWARGS` | Optional JSON kwargs for chat-name generation |
 
 Or pass them directly to `MongoBackendAdapter.initialize()`.
+
+## Agent LLM Config
+
+Agent accepts either a model string (inferred) or an explicit config object.
+
+```python
+from omniagent.ai.agents.agent import Agent
+from omniagent.types.llm import LLMModelConfig, SummaryLLMOverrides
+
+# Ergonomic model string path (provider/api inferred from env-configured maps)
+agent = Agent(
+    name="assistant",
+    description="General assistant",
+    instructions="You are helpful.",
+    model="gpt-4.1-mini",
+)
+
+# Explicit config path
+agent_with_config = Agent(
+    name="assistant",
+    description="General assistant",
+    instructions="You are helpful.",
+    model=LLMModelConfig(
+        provider="openai",
+        api_type="responses",
+        model="gpt-4.1-mini",
+        temperature=0.7,
+        request_kwargs={"max_output_tokens": 1200},
+        summary=SummaryLLMOverrides(
+            temperature=0.3,
+            request_kwargs={"max_output_tokens": 500},
+        ),
+    ),
+)
+```
+
+If a model string is not recognized by inference maps, OmniAgent raises a
+clear error and asks for an explicit `LLMModelConfig`.
 
 ## Schema Imports
 

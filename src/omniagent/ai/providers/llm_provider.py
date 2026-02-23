@@ -5,8 +5,9 @@ import inspect
 from omniagent import config
 from omniagent.domain_protocols import SummaryProtocol as Summary
 from omniagent.types.message import MessageDTO
+from omniagent.types.llm import LLMModelConfig
 from omniagent.ai.tools.tools import Tool
-from omniagent.config import BASE_MODEL, AISDK_ID_LENGTH
+from omniagent.config import AISDK_ID_LENGTH
 from omniagent.utils.general import generate_id
 
 
@@ -31,10 +32,8 @@ class LLMProvider(ABC):
     async def _call_llm(
         cls,
         input_messages: List[Dict],
-        model: str = BASE_MODEL,
-        temperature: float | None = None,
+        llm_config: LLMModelConfig,
         tools: List[Dict] | None = None,
-        tool_choice: str | None = None,
         instructions: str | None = None,
         stream: bool = False,
         on_stream_event: StreamCallback | None = None,
@@ -74,9 +73,8 @@ class LLMProvider(ABC):
     async def generate_response(
         cls, 
         conversation_history: List[MessageDTO], 
-        tools: List[Tool] = [],
-        tool_choice: str = "auto",
-        model_name: str = BASE_MODEL,
+        llm_config: LLMModelConfig,
+        tools: List[Tool] | None = None,
         ai_message: MessageDTO | None = None,
         stream: bool = False,
         on_stream_event: StreamCallback | None = None,
@@ -86,9 +84,8 @@ class LLMProvider(ABC):
         
         Args:
             conversation_history: List of previous messages
+            llm_config: Provider/model configuration for the LLM call
             tools: Available tools for function calling
-            tool_choice: Tool selection strategy ("auto", "required", "none")
-            model_name: LLM model to use
             ai_message: MessageDTO to update with AI response (must be provided)
             stream: Whether streaming is enabled
             on_stream_event: Callback for streaming events
@@ -109,6 +106,7 @@ class LLMProvider(ABC):
         query: str, 
         turns_after_last_summary: int,
         context_token_count: int,
+        llm_config: LLMModelConfig,
         tool_call: bool = False,
         new_chat: bool = False,
         turn_number: int = 1,
@@ -125,6 +123,7 @@ class LLMProvider(ABC):
     async def generate_chat_name(
         cls,
         query: str,
+        llm_config: LLMModelConfig,
         previous_summary: Summary | None = None,
         conversation_to_summarize: List[MessageDTO] | None = None,
         max_chat_name_length: int = 50,

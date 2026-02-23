@@ -4,7 +4,6 @@ from opentelemetry.trace import SpanKind
 
 from omniagent import config
 from omniagent.ai.agents.agent import Agent
-from omniagent.ai.providers import get_llm_provider
 from omniagent.ai.providers.llm_provider import StreamCallback
 from omniagent.types.chat import MessageQuery, RunnerOptions
 from omniagent.exceptions import (
@@ -47,10 +46,6 @@ class Runner:
         self.agent = agent
         self.session_manager = session_manager
         self.options = options or RunnerOptions()
-        self.llm_provider = get_llm_provider(
-            provider_name=config.LLM_PROVIDER,
-            **(self.options.provider_options or {}),
-        )
 
     @trace_method(
         kind=SpanKind.INTERNAL,
@@ -62,7 +57,7 @@ class Runner:
         self,
         conversation_history: List[MessageDTO],
         previous_conversation: List[MessageDTO],
-        ai_message: List[MessageDTO],
+        ai_message: MessageDTO,
         summary: SummaryProtocol | None,
         query: str,
         tool_call: bool,
@@ -91,8 +86,8 @@ class Runner:
         # Use mock methods if MOCK_AI_RESPONSE is enabled
         if config.MOCK_AI_RESPONSE:
             return await asyncio.gather(
-                self.llm_provider.mock_generate_response(step=self.session_manager.state.step),
-                self.llm_provider.mock_generate_summary(
+                self.agent.llm_provider.mock_generate_response(step=self.session_manager.state.step),
+                self.agent.llm_provider.mock_generate_summary(
                     query=query,
                     turns_after_last_summary=self.session_manager.state.turns_after_last_summary,
                     turn_number=self.session_manager.state.turn_number
@@ -102,17 +97,19 @@ class Runner:
         # Use real LLM methods - stream only if options.stream is True AND callback provided
         stream_enabled = self.options.stream and on_stream_event is not None
         return await asyncio.gather(
-            self.llm_provider.generate_response(
+            self.agent.llm_provider.generate_response(
                 conversation_history=conversation_history,
+                llm_config=self.agent.model,
                 tools=self.agent.tools,
                 ai_message=ai_message,
                 stream=stream_enabled,
                 on_stream_event=on_stream_event if stream_enabled else None,
             ),
-            self.llm_provider.generate_summary(
+            self.agent.llm_provider.generate_summary(
                 conversation_to_summarize=previous_conversation,
                 previous_summary=summary,
                 query=query,
+                llm_config=self.agent.model.effective_summary_config(),
                 turns_after_last_summary=self.session_manager.state.turns_after_last_summary,
                 context_token_count=self.session_manager.state.total_token_after_last_summary,
                 tool_call=tool_call,
@@ -149,7 +146,7 @@ class Runner:
             while not turn_completed:
                 if not tool_call:
                     previous_conversation, summary = await self.session_manager.get_context_and_update_state()
-                    system_message = self.llm_provider.build_system_message(
+                    system_message = self.agent.llm_provider.build_system_message(
                         instructions=self.agent.instructions,
                         summary=summary.content if summary else None,
                     )

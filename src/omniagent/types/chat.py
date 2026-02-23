@@ -1,14 +1,10 @@
 """Chat-related types for the OmniAgent runtime."""
 
 from pydantic import BaseModel, Field
-from typing import Literal, Dict, Any
 from dataclasses import dataclass
 
 from omniagent.utils.general import generate_id
 from omniagent.config import AISDK_ID_LENGTH
-
-# Type alias for LLM API type selection
-APIType = Literal["responses", "chat_completion"]
 
 
 class MessageQuery(BaseModel):
@@ -32,8 +28,6 @@ class RunnerOptions:
     Configuration options for the Runner.
     
     Attributes:
-        provider_options: Provider-specific options (e.g., {'api_type': 'chat_completion'} for OpenAI)
         stream: Whether to enable streaming responses (default: True)
     """
-    provider_options: Dict[str, Any] | None = None
     stream: bool = True

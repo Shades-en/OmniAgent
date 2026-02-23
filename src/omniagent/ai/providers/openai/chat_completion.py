@@ -10,8 +10,9 @@ from omniagent.ai.providers.utils import (
     create_tool_input_available_event,
 )
 from omniagent.ai.tools.tools import Tool
+from omniagent.types.llm import LLMModelConfig
 from omniagent.types.message import MessageDTO, Role, MessageAITextPart, MessageToolPart, ToolPartState
-from omniagent.config import BASE_MODEL
+from omniagent.constants import OPENAI_CHAT_COMPLETIONS_ALLOWED_REQUEST_KWARGS
 from omniagent.tracing import trace_method
 from omniagent.exceptions import MessageParseError
 
@@ -294,10 +295,8 @@ class OpenAIChatCompletionAPI(OpenAIProvider):
     async def _call_llm(
         cls,
         input_messages: List[Dict],
-        model: str = BASE_MODEL,
-        temperature: float | None = None,
+        llm_config: LLMModelConfig,
         tools: List[Dict] | None = None,
-        tool_choice: str | None = None,
         instructions: str | None = None,
         stream: bool = False,
         on_stream_event: StreamCallback | None = None,
@@ -306,14 +305,25 @@ class OpenAIChatCompletionAPI(OpenAIProvider):
     ) -> ChatCompletion:
         """Generic wrapper for OpenAI Chat Completions API calls."""
         kwargs = {
-            "model": model,
+            "model": llm_config.model,
             "messages": input_messages,
-            "temperature": temperature if temperature is not None else cls.temperature,
+            "temperature": (
+                llm_config.temperature
+                if llm_config.temperature is not None
+                else cls.temperature
+            ),
         }
+        request_kwargs = cls._validate_request_kwargs(
+            request_kwargs=llm_config.request_kwargs,
+            allowed_keys=OPENAI_CHAT_COMPLETIONS_ALLOWED_REQUEST_KWARGS,
+            api_label="OpenAI Chat Completions API",
+        )
+        if request_kwargs:
+            kwargs.update(request_kwargs)
         if tools:
             kwargs["tools"] = tools
-        if tool_choice:
-            kwargs["tool_choice"] = tool_choice
+        if tools and llm_config.tool_choice:
+            kwargs["tool_choice"] = llm_config.tool_choice
         # Note: instructions not supported in Chat Completions API, use system message instead
         
         client = cls._get_client()

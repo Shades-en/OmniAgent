@@ -16,8 +16,16 @@ from omniagent.db.document_models import (
     get_user_model,
 )
 from omniagent.domain_protocols import MessageProtocol, SummaryProtocol
-from omniagent.config import MAX_TURNS_TO_FETCH, LLM_PROVIDER
+from omniagent.config import (
+    CHAT_NAME_LLM_API_TYPE,
+    CHAT_NAME_LLM_PROVIDER,
+    CHAT_NAME_MODEL,
+    CHAT_NAME_REQUEST_KWARGS,
+    CHAT_NAME_TEMPERATURE,
+    MAX_TURNS_TO_FETCH,
+)
 from omniagent.tracing import trace_method, CustomSpanKinds
+from omniagent.types.llm import LLMModelConfig
 
 from omniagent.ai.providers import get_llm_provider
 from omniagent.ai.providers.utils import StreamCallback, stream_fallback_response
@@ -43,8 +51,6 @@ class MongoSessionManager(SessionManager):
         max_chat_name_words: int = 5,
         session_id: str | None = None,
         client_id: str | None = None,
-        provider_name: str | None = None,
-        provider_options: dict | None = None,
     ) -> str:
         """
         Generate a meaningful, concise chat name based on a query and optional session context.
@@ -52,16 +58,22 @@ class MongoSessionManager(SessionManager):
         - If no session_id: generate from query only.
         - If session_id: fetch summary + recent messages for context (if session exists for user).
         """
-        # Extract api_type from provider_options if available (for OpenAI)
-        # Other providers can use different keys from provider_options
+        chat_name_llm_config = LLMModelConfig(
+            provider=CHAT_NAME_LLM_PROVIDER,
+            api_type=CHAT_NAME_LLM_API_TYPE,
+            model=CHAT_NAME_MODEL,
+            temperature=CHAT_NAME_TEMPERATURE,
+            request_kwargs=CHAT_NAME_REQUEST_KWARGS,
+        )
         llm_provider = get_llm_provider(
-            provider_name=provider_name or LLM_PROVIDER,
-            **(provider_options or {})
+            provider_name=chat_name_llm_config.provider,
+            api_type=chat_name_llm_config.api_type,
         )
 
         if not session_id:
             return await llm_provider.generate_chat_name(
                 query=query,
+                llm_config=chat_name_llm_config,
                 max_chat_name_length=max_chat_name_length,
                 max_chat_name_words=max_chat_name_words,
             )
@@ -75,6 +87,7 @@ class MongoSessionManager(SessionManager):
         if session is None:
             return await llm_provider.generate_chat_name(
                 query=query,
+                llm_config=chat_name_llm_config,
                 max_chat_name_length=max_chat_name_length,
                 max_chat_name_words=max_chat_name_words,
             )
@@ -94,6 +107,7 @@ class MongoSessionManager(SessionManager):
         conversation_to_summarize = MessageModel.to_dtos(messages) if messages else None
         return await llm_provider.generate_chat_name(
             query=query,
+            llm_config=chat_name_llm_config,
             previous_summary=summary,
             conversation_to_summarize=conversation_to_summarize,
             max_chat_name_length=max_chat_name_length,

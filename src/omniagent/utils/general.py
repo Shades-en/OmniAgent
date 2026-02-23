@@ -1,4 +1,5 @@
 from uuid import uuid4
+import json
 import os
 import secrets
 import tiktoken
@@ -75,6 +76,44 @@ def _env_flag(name: str, default: bool = False) -> bool:
         return default
     return str(val).strip().lower() in {"1", "true", "yes", "on"}
 
+
+def _load_json_string_map(env_key: str, default: dict[str, str]) -> dict[str, str]:
+    """Load a JSON object from env and validate it as str->str mapping."""
+    raw_value = os.getenv(env_key)
+    if not raw_value:
+        return dict(default)
+
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{env_key} must be valid JSON: {exc}") from exc
+
+    if not isinstance(parsed, dict):
+        raise ValueError(f"{env_key} must be a JSON object mapping strings to strings")
+
+    normalized: dict[str, str] = {}
+    for key, value in parsed.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            raise ValueError(f"{env_key} keys and values must be strings")
+        normalized[key] = value
+    return normalized
+
+
+def _load_json_dict(env_key: str) -> dict[str, object]:
+    """Load a JSON object from env and validate it as dict."""
+    raw_value = os.getenv(env_key, "")
+    if not raw_value:
+        return {}
+
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{env_key} must be valid JSON: {exc}") from exc
+
+    if not isinstance(parsed, dict):
+        raise ValueError(f"{env_key} must be a JSON object")
+    return parsed
+
 def get_token_count(text: str) -> int:
     """Count tokens in text using tiktoken encoder for BASE_MODEL."""
     from omniagent.config import BASE_MODEL
@@ -88,5 +127,7 @@ __all__ = [
     "generate_id", 
     "get_env_int", 
     "_env_flag",
+    "_load_json_string_map",
+    "_load_json_dict",
     "get_token_count",
 ]

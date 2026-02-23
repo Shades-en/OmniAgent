@@ -15,9 +15,10 @@ from omniagent.ai.providers.utils import (
 )
 from omniagent.ai.tools.tools import Tool
 
+from omniagent.types.llm import LLMModelConfig
 from omniagent.types.message import MessageAITextPart, MessageDTO, MessageToolPart, Role, ToolPartState
-from omniagent.config import BASE_MODEL
 from omniagent.constants import (
+    OPENAI_RESPONSES_ALLOWED_REQUEST_KWARGS,
     OPENAI_EVENT_RESPONSE_CREATED,
     OPENAI_EVENT_TEXT_DELTA,
     OPENAI_EVENT_TEXT_DONE,
@@ -49,10 +50,8 @@ class OpenAIResponsesAPI(OpenAIProvider):
     async def _call_llm(
         cls,
         input_messages: List[Dict],
-        model: str = BASE_MODEL,
-        temperature: float | None = None,
+        llm_config: LLMModelConfig,
         tools: List[Dict] | None = None,
-        tool_choice: str | None = None,
         instructions: str | None = None,
         stream: bool = False,
         on_stream_event: StreamCallback | None = None,
@@ -61,14 +60,25 @@ class OpenAIResponsesAPI(OpenAIProvider):
     ) -> Response:
         """Generic wrapper for OpenAI Responses API calls."""
         kwargs = {
-            "model": model,
+            "model": llm_config.model,
             "input": input_messages,
-            "temperature": temperature if temperature is not None else cls.temperature,
+            "temperature": (
+                llm_config.temperature
+                if llm_config.temperature is not None
+                else cls.temperature
+            ),
         }
+        request_kwargs = cls._validate_request_kwargs(
+            request_kwargs=llm_config.request_kwargs,
+            allowed_keys=OPENAI_RESPONSES_ALLOWED_REQUEST_KWARGS,
+            api_label="OpenAI Responses API",
+        )
+        if request_kwargs:
+            kwargs.update(request_kwargs)
         if tools:
             kwargs["tools"] = tools
-        if tool_choice:
-            kwargs["tool_choice"] = tool_choice
+        if tools and llm_config.tool_choice:
+            kwargs["tool_choice"] = llm_config.tool_choice
         if instructions:
             kwargs["instructions"] = instructions
         client = cls._get_client()

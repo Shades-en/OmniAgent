@@ -25,6 +25,7 @@ from omniagent.utils.general import get_token_count
 from omniagent.tracing import trace_method
 
 from omniagent.domain_protocols import SummaryProtocol as Summary
+from omniagent.types.llm import LLMModelConfig
 from omniagent.types.message import (
     MessageDTO, 
     MessageHumanTextPart, 
@@ -34,7 +35,6 @@ from omniagent.types.message import (
     ToolPartState
 )
 from omniagent.config import (
-    BASE_MODEL, 
     MAX_TOKEN_THRESHOLD, 
     MAX_TURNS_TO_FETCH,
     CHAT_NAME_CONTEXT_MAX_MESSAGES,
@@ -70,7 +70,23 @@ class OpenAIProvider(LLMProvider, ABC):
                 kwargs["base_url"] = base_url
             cls.async_client = openai.AsyncOpenAI(**kwargs)
         return cls.async_client
-    
+
+    @classmethod
+    def _validate_request_kwargs(
+        cls,
+        request_kwargs: dict[str, object],
+        *,
+        allowed_keys: set[str],
+        api_label: str,
+    ) -> dict[str, object]:
+        invalid_keys = sorted(set(request_kwargs) - allowed_keys)
+        if invalid_keys:
+            invalid_keys_text = ", ".join(invalid_keys)
+            raise ValueError(
+                f"Unsupported request_kwargs for {api_label}: {invalid_keys_text}"
+            )
+        return dict(request_kwargs)
+
     @classmethod
     def _extract_text_from_response(cls, response: Response | ChatCompletion) -> str:
         """
@@ -100,28 +116,26 @@ class OpenAIProvider(LLMProvider, ABC):
     async def _call_llm(
         cls,
         input_messages: List[Dict],
-        model: str = BASE_MODEL,
-        temperature: float | None = None,
+        llm_config: LLMModelConfig,
         tools: List[Dict] | None = None,
-        tool_choice: str | None = None,
         instructions: str | None = None,
         stream: bool = False,
         on_stream_event: StreamCallback | None = None,
         message_id: str | None = None,
+        ai_message: MessageDTO | None = None,
     ) -> any:
         """
         Generic wrapper for OpenAI API calls. Implemented by subclasses.
         
         Args:
             input_messages: List of message dictionaries in OpenAI format
-            model: Model name to use
-            temperature: Temperature for response generation
+            llm_config: Provider/model request configuration
             tools: List of tool definitions in OpenAI format
-            tool_choice: Tool selection strategy
             instructions: System instructions
             stream: Whether to stream the response
             on_stream_event: Callback for streaming events
             message_id: Pre-generated message ID for streaming events
+            ai_message: Message object used for partial streaming accumulation
             
         Returns:
             Response object (Response or ChatCompletion depending on implementation)
@@ -245,9 +259,8 @@ class OpenAIProvider(LLMProvider, ABC):
     async def generate_response(
         cls, 
         conversation_history: List[MessageDTO], 
-        tools: List[Tool] = [],
-        tool_choice: str = "auto",
-        model_name: str = BASE_MODEL,
+        llm_config: LLMModelConfig,
+        tools: List[Tool] | None = None,
         ai_message: MessageDTO | None = None,
         stream: bool = False,
         on_stream_event: StreamCallback | None = None,
@@ -258,12 +271,12 @@ class OpenAIProvider(LLMProvider, ABC):
         Traced as LLM span with model name and tool information.
         OpenAI instrumentation will automatically capture tokens, latency, and costs.
         """
+        resolved_tools = tools or []
         input_messages = cls._convert_to_openai_compatible_messages(conversation_history)
         response = await cls._call_llm(
             input_messages=input_messages,
-            model=model_name,
-            tools=cls._convert_tools_to_openai_compatible(tools),
-            tool_choice=tool_choice,
+            llm_config=llm_config,
+            tools=cls._convert_tools_to_openai_compatible(resolved_tools),
             stream=stream,
             on_stream_event=on_stream_event,
             message_id=ai_message.id if ai_message else None,
@@ -272,7 +285,7 @@ class OpenAIProvider(LLMProvider, ABC):
         
         last_tool_call = await cls._handle_ai_messages_and_tool_calls(
             response,
-            tools,
+            resolved_tools,
             ai_message,
             stream,
             on_stream_event,
@@ -285,7 +298,8 @@ class OpenAIProvider(LLMProvider, ABC):
     async def _summarise(
         cls,
         conversation_to_summarize: List[MessageDTO], 
-        previous_summary: str | None, 
+        previous_summary: Summary | None,
+        llm_config: LLMModelConfig,
     ) -> str:
         """Generate a summary of the conversation combined with previous summary."""
         # Build the input for summarization
@@ -293,7 +307,7 @@ class OpenAIProvider(LLMProvider, ABC):
         if previous_summary:
             summary_input.append({
                 "role": "user",
-                "content": f"Previous conversation summary:\n{previous_summary}"
+                "content": f"Previous conversation summary:\n{previous_summary.content}"
             })
         
         # Add conversation messages - extract text from parts
@@ -318,8 +332,8 @@ class OpenAIProvider(LLMProvider, ABC):
         
         response = await cls._call_llm(
             input_messages=summary_input,
+            llm_config=llm_config,
             instructions=CONVERSATION_SUMMARY_PROMPT,
-            temperature=0.3,  # Lower temperature for more consistent summaries
         )
         return cls._extract_text_from_response(response)
 
@@ -337,6 +351,7 @@ class OpenAIProvider(LLMProvider, ABC):
         query: str, 
         turns_after_last_summary: int,
         context_token_count: int,
+        llm_config: LLMModelConfig,
         tool_call: bool = False,
         new_chat: bool = False,
         turn_number: int = 1,
@@ -371,7 +386,11 @@ class OpenAIProvider(LLMProvider, ABC):
                 (turns_after_last_summary >= MAX_TURNS_TO_FETCH)
             )
             if should_summarize:
-                summary_content = await cls._summarise(conversation_to_summarize, previous_summary)
+                summary_content = await cls._summarise(
+                    conversation_to_summarize=conversation_to_summarize,
+                    previous_summary=previous_summary,
+                    llm_config=llm_config,
+                )
                 summary = Summary(
                     content=summary_content, 
                     end_turn_number=turn_number-1,
@@ -432,6 +451,7 @@ class OpenAIProvider(LLMProvider, ABC):
     async def generate_chat_name(
         cls,
         query: str,
+        llm_config: LLMModelConfig,
         previous_summary: Summary | None = None,
         conversation_to_summarize: List[MessageDTO] | None = None,
         max_chat_name_length: int = 50,
@@ -482,8 +502,7 @@ class OpenAIProvider(LLMProvider, ABC):
             
             response = await cls._call_llm(
                 input_messages=input_messages,
-                model=BASE_MODEL,
-                temperature=0.7
+                llm_config=llm_config,
             )
             
             # Extract text from response
