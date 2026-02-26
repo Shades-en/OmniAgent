@@ -14,9 +14,7 @@ from omniagent.tracing import trace_operation, CustomSpanKinds
 from omniagent.exceptions import (
     MessageRetrievalError,
     MessageDeletionError,
-    MessageUpdateError,
 )
-from omniagent.types import Feedback
 from omniagent.config import DEFAULT_MESSAGE_PAGE_SIZE, MAX_TURNS_TO_FETCH
 from omniagent.types.message import Role, MessageAITextPart, MessageReasoningPart, MessageToolPart, MessageHumanTextPart, MessageDTO
 from omniagent.schemas.mongo.public_dict import PublicDictMixin
@@ -319,54 +317,6 @@ class Message(PublicDictMixin, Document):
             raise MessageRetrievalError(
                 "Failed to retrieve message by client_message_id and client_id",
                 details=f"client_message_id={client_message_id}, client_id={client_id}, error={str(e)}"
-            )
-    
-    @classmethod
-    @trace_operation(kind=SpanKind.INTERNAL, open_inference_kind=CustomSpanKinds.DATABASE.value)
-    async def update_feedback_by_client_id(cls, client_message_id: str, feedback: Feedback | None, client_id: str) -> dict:
-        """
-        Update the feedback for a message, authorized by client_id.
-        
-        Args:
-            client_message_id: The frontend-generated message ID (from AI SDK)
-            feedback: The feedback value (LIKE, DISLIKE, or None for neutral)
-            client_id: The user's client ID for authorization
-            
-        Returns:
-            Dictionary with update info: {
-                "message_updated": bool,
-                "message_id": str,
-                "feedback": str | None
-            }
-            
-        Raises:
-            MessageUpdateError: If update fails
-        
-        Traced as INTERNAL span for database operation.
-        """
-        try:
-            message = await cls.get_by_client_message_id_and_client_id(client_message_id, client_id)
-            
-            if not message:
-                return {
-                    "message_updated": False,
-                    "message_id": client_message_id,
-                    "feedback": feedback.value if feedback else None
-                }
-            
-            message.feedback = feedback
-            await message.save()
-            
-            return {
-                "message_updated": True,
-                "message_id": client_message_id,
-                "feedback": feedback.value if feedback else None
-            }
-                    
-        except Exception as e:
-            raise MessageUpdateError(
-                "Failed to update message feedback",
-                details=f"client_message_id={client_message_id}, client_id={client_id}, feedback={feedback}, error={str(e)}"
             )
     
     @classmethod

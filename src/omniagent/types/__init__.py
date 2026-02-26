@@ -12,7 +12,6 @@ from omniagent.types.chat import MessageQuery, RunnerOptions
 from omniagent.types.llm import APIType, LLMModelConfig, SummaryLLMOverrides
 from omniagent.types.state import State
 from omniagent.types.user import UserType
-from omniagent.types.feedback import Feedback
 
 __all__ = [
     # Message types
@@ -32,6 +31,4 @@ __all__ = [
     "State",
     # User types
     "UserType",
-    # Feedback types
-    "Feedback",
 ]

@@ -9,7 +9,7 @@ import logging
 
 from omniagent.session.base import SessionManager
 from omniagent.types.message import MessageDTO
-from omniagent.db.document_models import (
+from omniagent.db.mongo import (
     get_message_model,
     get_summary_model,
     get_session_model,

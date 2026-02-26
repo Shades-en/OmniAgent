@@ -8,7 +8,7 @@ from beanie import init_beanie, Document, Link
 from pymongo import AsyncMongoClient
 from opentelemetry.trace import SpanKind
 
-from omniagent.db.document_models import DocumentModels, set_document_models
+from omniagent.db.mongo.document_models import DocumentModels, set_document_models
 from omniagent.schemas.mongo import User, Session, Summary, Message
 from omniagent.tracing import trace_operation, CustomSpanKinds
 

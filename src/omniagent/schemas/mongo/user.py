@@ -17,7 +17,7 @@ from omniagent.exceptions import (
 )
 from omniagent.tracing import trace_operation, CustomSpanKinds
 from omniagent.types.user import UserType
-from omniagent.db.document_models import get_message_model, get_summary_model
+from omniagent.db.mongo import get_message_model, get_summary_model
 from omniagent.schemas.mongo.public_dict import PublicDictMixin
 
 

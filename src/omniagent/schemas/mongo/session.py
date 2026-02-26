@@ -21,7 +21,7 @@ from omniagent.exceptions import (
 )
 from omniagent.config import DEFAULT_SESSION_NAME, DEFAULT_SESSION_PAGE_SIZE
 from omniagent.tracing import trace_method, trace_operation, CustomSpanKinds
-from omniagent.db.document_models import (
+from omniagent.db.mongo import (
     get_message_model,
     get_summary_model,
     get_user_model,

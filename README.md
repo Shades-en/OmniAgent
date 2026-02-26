@@ -33,25 +33,31 @@ pip install -e .
 ### 1. Initialize the Database
 
 ```python
-from omniagent.persistence.backends.mongo import MongoBackendAdapter
+from omniagent.persistence import (
+    PersistenceBackend,
+    get_context,
+    initialize_persistence,
+    shutdown_persistence,
+)
 
 # In your FastAPI lifespan or startup
 async def startup():
-    await MongoBackendAdapter.initialize(
+    await initialize_persistence(
+        backend=PersistenceBackend.MONGO,
         db_name="your_db",
-        srv_uri="mongodb+srv://..."
+        srv_uri="mongodb+srv://...",
     )
 
 async def shutdown():
-    await MongoBackendAdapter.shutdown()
+    await shutdown_persistence()
 ```
 
 ### 2. Create a Session Manager
 
 ```python
-from omniagent.session import MongoSessionManager
+from omniagent.persistence import get_context
 
-session_manager = MongoSessionManager(
+session_manager = get_context().session_manager_cls(
     session_id="session_456",
     user_client_id="client_abc",
 )
@@ -140,8 +146,6 @@ Set these environment variables:
 | `CHAT_NAME_TEMPERATURE` | Temperature used by chat-name generation |
 | `CHAT_NAME_REQUEST_KWARGS` | Optional JSON kwargs for chat-name generation |
 
-Or pass them directly to `MongoBackendAdapter.initialize()`.
-
 ## Agent LLM Config
 
 Agent accepts either a model string (inferred) or an explicit config object.
@@ -197,7 +201,7 @@ If your app needs favorites, extend `Session` in your consumer app and pass it t
 from pydantic import Field
 
 from omniagent.db.document_models import DocumentModels
-from omniagent.persistence.backends.mongo import MongoBackendAdapter
+from omniagent.persistence import PersistenceBackend, initialize_persistence
 from omniagent.schemas.mongo import Message, Session, Summary, User
 
 
@@ -214,14 +218,29 @@ class CustomSession(Session):
         return {"session_updated": True, "session_id": session_id, "starred": starred}
 
 
-await MongoBackendAdapter.initialize(
+await initialize_persistence(
+    backend=PersistenceBackend.MONGO,
     models=DocumentModels(
         user=User,
         session=CustomSession,
         summary=Summary,
         message=Message,
-    )
+    ),
 )
+```
+
+Consumer apps can register optional extension repositories on the active persistence context.
+
+```python
+from omniagent.persistence import (
+    get_context,
+    register_extension,
+)
+
+register_extension(name="favorites", repo=my_favorites_repo, capability="favorites")
+
+ctx = get_context()
+favorites_repo = ctx.extensions["favorites"]
 ```
 
 ## Observability
@@ -260,3 +279,5 @@ Contributions are welcome! Please open an issue or submit a pull request.
 # TODO
 
 - [ ] Add file upload support in runner flow
+- [ ] remove mock functionality
+- [ ] initialize_persistence method is using alot of mongospecific variables.

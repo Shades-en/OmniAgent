@@ -1,11 +1,11 @@
-"""Validation helpers for domain and repository contracts of document models."""
+"""Mongo-specific validation helpers for document model contracts."""
 
 from __future__ import annotations
 
 import inspect
 from typing import Any, Iterable
 
-from omniagent.db.document_models import DocumentModels
+from omniagent.db.mongo import DocumentModels
 from omniagent.domain_protocols import MessageProtocol, SessionProtocol, SummaryProtocol, UserProtocol
 
 
@@ -40,7 +40,7 @@ def _validate_model_protocol_contract(model: type[Any], protocol: type[Any], mod
 
 
 def validate_document_models(models: DocumentModels) -> None:
-    """Validate backend-supplied document models against domain protocols."""
+    """Validate Mongo document models against domain protocols."""
     _validate_model_protocol_contract(models.user, UserProtocol, "User model")
     _validate_model_protocol_contract(models.session, SessionProtocol, "Session model")
     _validate_model_protocol_contract(models.message, MessageProtocol, "Message model")
@@ -66,7 +66,6 @@ _REPOSITORY_MODEL_METHOD_CONTRACTS: dict[str, dict[str, dict[str, Any]]] = {
         "get_paginated_by_session": {"required_params": ("session_id", "page", "page_size")},
         "count_by_session": {"required_params": ("session_id",)},
         "get_all_by_session": {"required_params": ("session_id",)},
-        "update_feedback_by_client_id": {"required_params": ("client_message_id", "feedback", "client_id")},
         "delete_by_client_message_id_and_client_id": {"required_params": ("client_message_id", "client_id")},
         "to_public_dicts": {"min_params": 1},
     },
@@ -117,7 +116,7 @@ def _validate_method_contract(
 
 
 def validate_repository_models(models: DocumentModels) -> None:
-    """Validate repository-required methods on configured document model classes."""
+    """Validate repository-required methods on configured Mongo model classes."""
     model_map = {
         "User model": models.user,
         "Session model": models.session,
@@ -134,3 +133,4 @@ def validate_repository_models(models: DocumentModels) -> None:
                 required_params=contract.get("required_params"),
                 min_params=contract.get("min_params"),
             )
+

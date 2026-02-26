@@ -2,6 +2,8 @@ from uuid import uuid4
 import json
 import os
 import secrets
+from datetime import datetime
+from typing import Any
 import tiktoken
 from bson import ObjectId
 
@@ -123,6 +125,13 @@ def get_token_count(text: str) -> int:
         _tiktoken_encoder = tiktoken.encoding_for_model(BASE_MODEL)
     return len(_tiktoken_encoder.encode(text))
 
+
+def iso_or_empty(value: Any) -> str:
+    """Return ISO-8601 string for datetime values, otherwise empty string."""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return ""
+
 __all__ = [
     "generate_id", 
     "get_env_int", 
@@ -130,4 +139,5 @@ __all__ = [
     "_load_json_string_map",
     "_load_json_dict",
     "get_token_count",
+    "iso_or_empty",
 ]

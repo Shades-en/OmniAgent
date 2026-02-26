@@ -4,10 +4,22 @@ from __future__ import annotations
 
 from beanie import Document
 
-from omniagent.db.document_models import DocumentModels
+from omniagent.db.mongo import DocumentModels
 from omniagent.db.mongo import DEFAULT_MODELS, MongoDB
+from omniagent.persistence.backends.mongo.repositories import (
+    MongoMessageRepository,
+    MongoSessionRepository,
+    MongoSummaryRepository,
+    MongoUserRepository,
+)
 from omniagent.persistence.backends.base import BackendAdapterBase
-from omniagent.persistence.model_contracts import validate_document_models, validate_repository_models
+from omniagent.persistence.context import PersistenceContext, RepositoryBundle
+from omniagent.persistence.backends.mongo.model_contracts import (
+    validate_document_models,
+    validate_repository_models,
+)
+from omniagent.persistence.types import PersistenceBackend
+from omniagent.session.mongo import MongoSessionManager
 
 
 class MongoBackendAdapter(BackendAdapterBase):
@@ -21,7 +33,7 @@ class MongoBackendAdapter(BackendAdapterBase):
         allow_index_dropping: bool = False,
         models: DocumentModels | None = None,
         extra_document_models: list[type[Document]] | None = None,
-    ) -> None:
+    ) -> PersistenceContext:
         if models is not None and not isinstance(models, DocumentModels):
             raise TypeError("initialize(models=...) must be a DocumentModels instance.")
 
@@ -35,6 +47,21 @@ class MongoBackendAdapter(BackendAdapterBase):
             allow_index_dropping=allow_index_dropping,
             models=resolved_models,
             extra_document_models=extra_document_models,
+        )
+
+        repositories = RepositoryBundle(
+            users=MongoUserRepository(user_model=resolved_models.user),
+            sessions=MongoSessionRepository(session_model=resolved_models.session),
+            messages=MongoMessageRepository(message_model=resolved_models.message),
+            summaries=MongoSummaryRepository(
+                summary_model=resolved_models.summary,
+                session_model=resolved_models.session,
+            ),
+        )
+        return PersistenceContext(
+            backend=PersistenceBackend.MONGO,
+            repositories=repositories,
+            session_manager_cls=MongoSessionManager,
         )
 
     @classmethod

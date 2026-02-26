@@ -6,7 +6,8 @@ from abc import ABC, abstractmethod
 
 from beanie import Document
 
-from omniagent.db.document_models import DocumentModels
+from omniagent.db.mongo import DocumentModels
+from omniagent.persistence.context import PersistenceContext
 
 
 class BackendAdapterBase(ABC):
@@ -21,7 +22,7 @@ class BackendAdapterBase(ABC):
         allow_index_dropping: bool = False,
         models: DocumentModels | None = None,
         extra_document_models: list[type[Document]] | None = None,
-    ) -> None:
+    ) -> PersistenceContext:
         ...
 
     @classmethod

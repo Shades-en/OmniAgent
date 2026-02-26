@@ -13,7 +13,7 @@ from omniagent.exceptions import (
     MaxStepsReachedError,
 )
 from omniagent.domain_protocols import SummaryProtocol
-from omniagent.db.document_models import get_summary_model
+from omniagent.db.mongo import get_summary_model
 from omniagent.types.message import MessageDTO
 from omniagent.session import SessionManager
 from omniagent.tracing import trace_method

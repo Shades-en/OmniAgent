@@ -24,7 +24,10 @@ def set_document_models(*, user: Type[Document], session: Type[Document], summar
 
 def get_document_models() -> DocumentModels:
     if _DOCUMENT_MODELS is None:
-        raise RuntimeError("Document models not configured. Call MongoBackendAdapter.initialize() first.")
+        raise RuntimeError(
+            "Document models not configured. "
+            "Call initialize_persistence(backend=PersistenceBackend.MONGO, ...) first."
+        )
     return _DOCUMENT_MODELS
 
 

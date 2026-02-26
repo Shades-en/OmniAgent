@@ -45,6 +45,25 @@ class SessionManager(ABC):
     def _inititialise_state(self, state: dict) -> State:
         return State(user_defined_state=state)
 
+    @classmethod
+    @abstractmethod
+    async def generate_chat_name(
+        cls,
+        *,
+        query: str,
+        turns_between_chat_name: int = 20,
+        max_chat_name_length: int = 50,
+        max_chat_name_words: int = 5,
+        session_id: str | None = None,
+        client_id: str | None = None,
+    ) -> str:
+        """
+        Generate a chat name using backend-specific context retrieval and provider calls.
+
+        Must be implemented by backend-specific session managers.
+        """
+        ...
+
     @abstractmethod
     async def _fetch_user_or_session(self) -> None:
         """
