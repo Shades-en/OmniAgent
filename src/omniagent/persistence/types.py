@@ -4,16 +4,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 
 class PersistenceBackend(str, Enum):
     """Supported persistence backends."""
 
     MONGO = "mongo"
+    POSTGRES = "postgres"
 
 
 if TYPE_CHECKING:
+    from beanie import Document
+
+    from omniagent.db.mongo import DocumentModels
+    from omniagent.db.postgres import PostgresModels
     from omniagent.persistence.contracts import (
         MessageRepository,
         SessionRepository,
@@ -22,17 +27,37 @@ if TYPE_CHECKING:
     )
 
 
-UserRepositoryOverride = Callable[["UserRepository"], "UserRepository"]
-SessionRepositoryOverride = Callable[["SessionRepository"], "SessionRepository"]
-MessageRepositoryOverride = Callable[["MessageRepository"], "MessageRepository"]
-SummaryRepositoryOverride = Callable[["SummaryRepository"], "SummaryRepository"]
+@dataclass(slots=True)
+class RepositoryOverrides:
+    """Init-time repository replacements for domain customization."""
+
+    users: "UserRepository | None" = None
+    sessions: "SessionRepository | None" = None
+    messages: "MessageRepository | None" = None
+    summaries: "SummaryRepository | None" = None
 
 
 @dataclass(slots=True)
-class RepositoryOverrides:
-    """Init-time repository wrappers for domain customization."""
+class MongoPersistenceConfig:
+    """Mongo backend initialization config."""
 
-    users: UserRepositoryOverride | None = None
-    sessions: SessionRepositoryOverride | None = None
-    messages: MessageRepositoryOverride | None = None
-    summaries: SummaryRepositoryOverride | None = None
+    db_name: str | None = None
+    srv_uri: str | None = None
+    allow_index_dropping: bool = False
+    models: "DocumentModels | None" = None
+    extra_document_models: list[type["Document"]] | None = None
+
+
+@dataclass(slots=True)
+class PostgresPersistenceConfig:
+    """Postgres backend initialization config."""
+
+    dsn: str | None = None
+    user: str | None = None
+    password: str | None = None
+    host: str | None = None
+    port: int | None = None
+    dbname: str | None = None
+    sslmode: str = "require"
+    reset_schema: bool = False
+    models: "PostgresModels | None" = None

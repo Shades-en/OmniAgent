@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
-from beanie import Document
-
-from omniagent.db.mongo import DocumentModels
 from omniagent.persistence.context import PersistenceContext
 
 
@@ -17,11 +15,7 @@ class BackendAdapterBase(ABC):
     @abstractmethod
     async def initialize(
         cls,
-        db_name: str | None = None,
-        srv_uri: str | None = None,
-        allow_index_dropping: bool = False,
-        models: DocumentModels | None = None,
-        extra_document_models: list[type[Document]] | None = None,
+        config: Any,
     ) -> PersistenceContext:
         ...
 

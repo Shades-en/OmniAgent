@@ -3,7 +3,8 @@ from typing import List, Dict, Callable, Awaitable, Any
 import inspect
 
 from omniagent import config
-from omniagent.domain_protocols import SummaryProtocol as Summary
+from omniagent.domain_protocols import SummaryProtocol
+from omniagent.types.summary import GeneratedSummary
 from omniagent.types.message import MessageDTO
 from omniagent.types.llm import LLMModelConfig
 from omniagent.ai.tools.tools import Tool
@@ -102,7 +103,7 @@ class LLMProvider(ABC):
     async def generate_summary(
         cls, 
         conversation_to_summarize: List[MessageDTO], 
-        previous_summary: Summary | None, 
+        previous_summary: SummaryProtocol | None, 
         query: str, 
         turns_after_last_summary: int,
         context_token_count: int,
@@ -110,7 +111,7 @@ class LLMProvider(ABC):
         tool_call: bool = False,
         new_chat: bool = False,
         turn_number: int = 1,
-    ) -> Summary | None:
+    ) -> SummaryProtocol | None:
         """
         Generate a summary based on conversation state.
         
@@ -124,7 +125,7 @@ class LLMProvider(ABC):
         cls,
         query: str,
         llm_config: LLMModelConfig,
-        previous_summary: Summary | None = None,
+        previous_summary: SummaryProtocol | None = None,
         conversation_to_summarize: List[MessageDTO] | None = None,
         max_chat_name_length: int = 50,
         max_chat_name_words: int = 5,
@@ -209,7 +210,7 @@ class LLMProvider(ABC):
         query: str,
         turns_after_last_summary: int = 0,
         turn_number: int = 1,
-    ) -> Summary | None:
+    ) -> SummaryProtocol | None:
         """
         Mock implementation of generate_summary for testing purposes.
         Returns dummy summary without making actual LLM calls.
@@ -219,10 +220,11 @@ class LLMProvider(ABC):
         """
         if config.MOCK_AI_SUMMARY:
             mock_summary = "Mock summary: This is a test summary of the conversation without actual LLM processing."
-            return Summary(
+            return GeneratedSummary(
                 content=mock_summary,
                 end_turn_number=turn_number-1,
-                start_turn_number=turn_number-turns_after_last_summary
+                start_turn_number=turn_number-turns_after_last_summary,
+                token_count=0,
             )
         return None
 
@@ -230,7 +232,7 @@ class LLMProvider(ABC):
     async def mock_generate_chat_name(
         cls,
         query: str,
-        previous_summary: Summary | None = None,
+        previous_summary: SummaryProtocol | None = None,
         conversation_to_summarize: List[MessageDTO] | None = None,
         max_chat_name_length: int = 50,
         max_chat_name_words: int = 5,

@@ -132,6 +132,24 @@ def iso_or_empty(value: Any) -> str:
         return value.isoformat()
     return ""
 
+
+def _json_default(value: Any) -> Any:
+    """Fallback serializer for json-safe normalization."""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, ObjectId):
+        return str(value)
+    if hasattr(value, "model_dump"):
+        return value.model_dump(mode="json")
+    if hasattr(value, "to_public_dict"):
+        return value.to_public_dict()
+    return str(value)
+
+
+def to_json_safe(value: Any) -> Any:
+    """Normalize arbitrary objects into JSON-safe structures."""
+    return json.loads(json.dumps(value, default=_json_default))
+
 __all__ = [
     "generate_id", 
     "get_env_int", 
@@ -140,4 +158,5 @@ __all__ = [
     "_load_json_dict",
     "get_token_count",
     "iso_or_empty",
+    "to_json_safe",
 ]

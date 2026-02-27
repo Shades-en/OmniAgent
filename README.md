@@ -7,7 +7,7 @@ An extensible agent runtime and orchestration framework for building production-
 
 ## Features
 
-- **Session Management** - Persistent conversation sessions with MongoDB backend
+- **Session Management** - Persistent conversation sessions with MongoDB or PostgreSQL backends
 - **Context Orchestration** - Automatic context window management with summarization
 - **Multi-Provider Support** - OpenAI Chat Completions and Responses API
 - **Tool Calling** - Built-in support for function/tool calling with parallel execution
@@ -34,6 +34,7 @@ pip install -e .
 
 ```python
 from omniagent.persistence import (
+    MongoPersistenceConfig,
     PersistenceBackend,
     get_context,
     initialize_persistence,
@@ -44,13 +45,17 @@ from omniagent.persistence import (
 async def startup():
     await initialize_persistence(
         backend=PersistenceBackend.MONGO,
-        db_name="your_db",
-        srv_uri="mongodb+srv://...",
+        backend_config=MongoPersistenceConfig(
+            db_name="your_db",
+            srv_uri="mongodb+srv://...",
+        ),
     )
 
 async def shutdown():
     await shutdown_persistence()
 ```
+
+Postgres initialization uses `PostgresPersistenceConfig` with either full DSN or split connection keys.
 
 ### 2. Create a Session Manager
 
@@ -90,13 +95,16 @@ omniagent/
 │   ├── runner.py        # Main orchestration runner
 │   └── tools/           # Tool definitions
 ├── db/
-│   └── mongo.py         # MongoDB connection management
+│   ├── mongo/           # MongoDB connection management
+│   └── postgres/        # PostgreSQL connection management
 ├── exceptions/          # Custom exception hierarchy
 ├── schemas/
-│   └── mongo/           # Beanie ODM models
+│   ├── mongo/           # Beanie ODM models
+│   └── postgres/        # SQLAlchemy ORM models
 ├── session/
 │   ├── base.py          # Abstract SessionManager
-│   └── mongo.py         # MongoDB implementation
+│   ├── mongo.py         # MongoDB implementation
+│   └── postgres.py      # PostgreSQL implementation
 ├── types/               # Shared types and DTOs
 └── utils/               # Utilities (tracing, etc.)
 ```
@@ -135,6 +143,13 @@ Set these environment variables:
 |----------|-------------|
 | `MONGO_SRV_URI` | MongoDB connection string |
 | `MONGO_DB_NAME` | Database name |
+| `POSTGRES_DSN` | Optional full PostgreSQL DSN |
+| `POSTGRES_USER` | PostgreSQL username (split config) |
+| `POSTGRES_PASSWORD` | PostgreSQL password (split config) |
+| `POSTGRES_HOST` | PostgreSQL host (split config) |
+| `POSTGRES_PORT` | PostgreSQL port (split config) |
+| `POSTGRES_DBNAME` | PostgreSQL database name (split config) |
+| `POSTGRES_SSLMODE` | PostgreSQL SSL mode (`require` by default) |
 | `OPENAI_API_KEY` | OpenAI API key |
 | `LLM_PROVIDER` | Default LLM provider |
 | `LLM_API_TYPE` | Default API type (`responses` or `chat_completion`) |
@@ -195,52 +210,51 @@ from omniagent.schemas.mongo import Session, User, Message, Summary
 ## Consumer Extensions (Favorites)
 
 `starred`/favorite session behavior is intentionally not part of OmniAgent core.
-If your app needs favorites, extend `Session` in your consumer app and pass it through `DocumentModels`.
+If your app needs favorites, extend backend-specific session/message models in your consumer app and pass them via backend model config during initialization.
 
 ```python
-from pydantic import Field
+from sqlalchemy import Boolean
+from sqlalchemy.orm import Mapped, mapped_column
 
-from omniagent.db.document_models import DocumentModels
-from omniagent.persistence import PersistenceBackend, initialize_persistence
-from omniagent.schemas.mongo import Message, Session, Summary, User
+from omniagent.db.postgres import PostgresModels
+from omniagent.persistence import (
+    PersistenceBackend,
+    PostgresPersistenceConfig,
+    RepositoryOverrides,
+    initialize_persistence,
+)
+from omniagent.schemas.postgres import Message, Session, Summary, User
 
 
 class CustomSession(Session):
-    starred: bool = Field(default=False)
+    starred: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     @classmethod
     async def update_starred_by_client_id(cls, session_id: str, starred: bool, client_id: str) -> dict:
-        session = await cls.get_by_id_and_client_id(session_id, client_id)
-        if not session:
-            return {"session_updated": False, "session_id": session_id, "starred": starred}
-        session.starred = starred
-        await session.save()
-        return {"session_updated": True, "session_id": session_id, "starred": starred}
+        ...
+
+
+def wrap_sessions(base_repo):
+    return MySessionRepoWithFavorites(base_repo=base_repo, session_model=CustomSession)
 
 
 await initialize_persistence(
-    backend=PersistenceBackend.MONGO,
-    models=DocumentModels(
-        user=User,
-        session=CustomSession,
-        summary=Summary,
-        message=Message,
+    backend=PersistenceBackend.POSTGRES,
+    backend_config=PostgresPersistenceConfig(
+        user="postgres",
+        password="...",
+        host="...",
+        port=5432,
+        dbname="...",
+        models=PostgresModels(
+            user=User,
+            session=CustomSession,
+            summary=Summary,
+            message=Message,
+        ),
     ),
+    repository_overrides=RepositoryOverrides(sessions=wrap_sessions),
 )
-```
-
-Consumer apps can register optional extension repositories on the active persistence context.
-
-```python
-from omniagent.persistence import (
-    get_context,
-    register_extension,
-)
-
-register_extension(name="favorites", repo=my_favorites_repo, capability="favorites")
-
-ctx = get_context()
-favorites_repo = ctx.extensions["favorites"]
 ```
 
 ## Observability
@@ -262,9 +276,7 @@ instrumentation remains consumer-owned and can be enabled separately.
 
 ## Roadmap
 
-- [ ] Timeouts and retries
 - [ ] Guardrails
-- [ ] Redis caching
 - [ ] Additional LLM providers (Anthropic, Google, etc.)
 - [ ] Multi-agent orchestration
 
@@ -277,7 +289,6 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 Contributions are welcome! Please open an issue or submit a pull request.
 
 # TODO
-
-- [ ] Add file upload support in runner flow
-- [ ] remove mock functionality
-- [ ] initialize_persistence method is using alot of mongospecific variables.
+1. Add file upload support in runner flow
+2. Remove mock functionality -> Past this make twitter bot (Important)
+3. Maybe just maybe the repositories can be made one??

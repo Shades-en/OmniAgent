@@ -24,7 +24,7 @@ from omniagent.ai.providers.utils import (
 from omniagent.utils.general import get_token_count
 from omniagent.tracing import trace_method
 
-from omniagent.domain_protocols import SummaryProtocol as Summary
+from omniagent.domain_protocols import SummaryProtocol
 from omniagent.types.llm import LLMModelConfig
 from omniagent.types.message import (
     MessageDTO, 
@@ -34,6 +34,7 @@ from omniagent.types.message import (
     MessageToolPart,
     ToolPartState
 )
+from omniagent.types.summary import GeneratedSummary
 from omniagent.config import (
     MAX_TOKEN_THRESHOLD, 
     MAX_TURNS_TO_FETCH,
@@ -297,8 +298,8 @@ class OpenAIProvider(LLMProvider, ABC):
     @classmethod
     async def _summarise(
         cls,
-        conversation_to_summarize: List[MessageDTO], 
-        previous_summary: Summary | None,
+        conversation_to_summarize: List[MessageDTO],
+        previous_summary: SummaryProtocol | None,
         llm_config: LLMModelConfig,
     ) -> str:
         """Generate a summary of the conversation combined with previous summary."""
@@ -347,7 +348,7 @@ class OpenAIProvider(LLMProvider, ABC):
     async def generate_summary(
         cls, 
         conversation_to_summarize: List[MessageDTO], 
-        previous_summary: Summary | None, 
+        previous_summary: SummaryProtocol | None, 
         query: str, 
         turns_after_last_summary: int,
         context_token_count: int,
@@ -355,7 +356,7 @@ class OpenAIProvider(LLMProvider, ABC):
         tool_call: bool = False,
         new_chat: bool = False,
         turn_number: int = 1,
-    ) -> Summary | None:
+    ) -> SummaryProtocol | None:
         """
         Generate a summary based on conversation state.
         
@@ -391,10 +392,11 @@ class OpenAIProvider(LLMProvider, ABC):
                     previous_summary=previous_summary,
                     llm_config=llm_config,
                 )
-                summary = Summary(
+                summary = GeneratedSummary(
                     content=summary_content, 
                     end_turn_number=turn_number-1,
-                    start_turn_number=turn_number-turns_after_last_summary
+                    start_turn_number=turn_number-turns_after_last_summary,
+                    token_count=get_token_count(summary_content),
                 )
                 logger.info(f"Generated summary for turn {turn_number}")
                 return summary
@@ -452,7 +454,7 @@ class OpenAIProvider(LLMProvider, ABC):
         cls,
         query: str,
         llm_config: LLMModelConfig,
-        previous_summary: Summary | None = None,
+        previous_summary: SummaryProtocol | None = None,
         conversation_to_summarize: List[MessageDTO] | None = None,
         max_chat_name_length: int = 50,
         max_chat_name_words: int = 5,

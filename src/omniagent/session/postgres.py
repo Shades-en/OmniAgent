@@ -1,10 +1,8 @@
-"""
-MongoDB-specific SessionManager implementation using Beanie ODM.
-"""
+"""Postgres-specific SessionManager implementation using SQLAlchemy ORM."""
 
 from __future__ import annotations
 
-from omniagent.db.mongo import (
+from omniagent.db.postgres import (
     get_message_model,
     get_session_model,
     get_summary_model,
@@ -13,12 +11,8 @@ from omniagent.db.mongo import (
 from omniagent.session.base import SessionManager
 
 
-class MongoSessionManager(SessionManager):
-    """
-    MongoDB-specific SessionManager.
-
-    Shared session lifecycle logic is implemented in SessionManager base class.
-    """
+class PostgresSessionManager(SessionManager):
+    """Postgres implementation of SessionManager."""
 
     @classmethod
     def _get_message_model(cls):
