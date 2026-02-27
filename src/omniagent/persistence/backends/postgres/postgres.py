@@ -1,10 +1,15 @@
-"""MongoDB persistence backend adapter lifecycle."""
+"""Postgres persistence backend adapter lifecycle."""
 
 from __future__ import annotations
 
-from omniagent.db.mongo import DEFAULT_MODELS, MongoDB
+from omniagent.db.postgres import (
+    DEFAULT_MODELS,
+    PostgresDB,
+    bootstrap_postgres_schema,
+    set_postgres_models,
+)
 from omniagent.persistence.backends.base import BackendAdapterBase
-from omniagent.persistence.backends.mongo.model_contracts import (
+from omniagent.persistence.backends.postgres.model_contracts import (
     validate_document_models,
     validate_repository_models,
 )
@@ -15,31 +20,30 @@ from omniagent.persistence.repositories import (
     SharedSummaryRepository,
     SharedUserRepository,
 )
-from omniagent.persistence.types import MongoPersistenceConfig, PersistenceBackend
-from omniagent.session.mongo import MongoSessionManager
+from omniagent.persistence.types import PersistenceBackend, PostgresPersistenceConfig
+from omniagent.session.postgres import PostgresSessionManager
 
 
-class MongoBackendAdapter(BackendAdapterBase):
-    """Lifecycle adapter for Mongo persistence initialization and shutdown."""
+class PostgresBackendAdapter(BackendAdapterBase):
+    """Lifecycle adapter for Postgres persistence initialization and shutdown."""
 
     @classmethod
     async def initialize(
         cls,
-        config: MongoPersistenceConfig,
+        config: PostgresPersistenceConfig,
     ) -> PersistenceContext:
-        if not isinstance(config, MongoPersistenceConfig):
-            raise TypeError("Mongo backend requires MongoPersistenceConfig.")
+        if not isinstance(config, PostgresPersistenceConfig):
+            raise TypeError("Postgres backend requires PostgresPersistenceConfig.")
 
         resolved_models = config.models or DEFAULT_MODELS
         validate_document_models(resolved_models)
         validate_repository_models(resolved_models)
 
-        await MongoDB.init(
-            db_name=config.db_name,
-            srv_uri=config.srv_uri,
-            allow_index_dropping=config.allow_index_dropping,
+        set_postgres_models(resolved_models)
+        await PostgresDB.init(config=config)
+        await bootstrap_postgres_schema(
             models=resolved_models,
-            extra_document_models=config.extra_document_models,
+            reset_schema=config.reset_schema,
         )
 
         repositories = RepositoryBundle(
@@ -48,12 +52,13 @@ class MongoBackendAdapter(BackendAdapterBase):
             messages=SharedMessageRepository(message_model=resolved_models.message),
             summaries=SharedSummaryRepository(summary_model=resolved_models.summary),
         )
+
         return PersistenceContext(
-            backend=PersistenceBackend.MONGO,
+            backend=PersistenceBackend.POSTGRES,
             repositories=repositories,
-            session_manager_cls=MongoSessionManager,
+            session_manager_cls=PostgresSessionManager,
         )
 
     @classmethod
     async def shutdown(cls) -> None:
-        await MongoDB.close()
+        await PostgresDB.close()

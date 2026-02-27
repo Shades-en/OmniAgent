@@ -4,18 +4,32 @@ Base SessionManager abstract class for OmniAgent.
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import List, Tuple
-
+from typing import Any, List, Tuple
 import logging
 
+from omniagent.ai.providers import get_llm_provider
+from omniagent.ai.providers.utils import StreamCallback, stream_fallback_response
+
+from omniagent.domain_protocols import MessageProtocol, SessionProtocol, SummaryProtocol, UserProtocol
+from omniagent.utils.general import generate_id
+
+from omniagent.config import MAX_TOKEN_THRESHOLD
+from omniagent.config import (
+    AISDK_ID_LENGTH,
+    CHAT_NAME_LLM_API_TYPE,
+    CHAT_NAME_LLM_PROVIDER,
+    CHAT_NAME_MODEL,
+    CHAT_NAME_REQUEST_KWARGS,
+    CHAT_NAME_TEMPERATURE,
+    MAX_TURNS_TO_FETCH,
+)
+
+from omniagent.types.llm import LLMModelConfig
 from omniagent.types.state import State
 from omniagent.types.message import MessageDTO
-from omniagent.domain_protocols import UserProtocol, SessionProtocol, MessageProtocol, SummaryProtocol
-from omniagent.config import MAX_TOKEN_THRESHOLD
-from omniagent.utils.general import generate_id
-from omniagent.config import AISDK_ID_LENGTH
+
+from omniagent.tracing import CustomSpanKinds, trace_method
 from omniagent.tracing import track_state_change
-from omniagent.ai.providers.utils import StreamCallback
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +46,9 @@ class SessionManager(ABC):
         self, 
         session_id: str | None, 
         user_client_id: str,
-        state: dict = {}, 
+        state: dict | None = None,
     ):
-        self.state = self._inititialise_state(state=state)
+        self.state = self._inititialise_state(state=state or {})
         self.session_id = session_id
         self.user_client_id = user_client_id
         self.user: UserProtocol | None = None
@@ -47,6 +61,29 @@ class SessionManager(ABC):
 
     @classmethod
     @abstractmethod
+    def _get_message_model(cls) -> Any:
+        """Return backend-specific Message model class."""
+        ...
+
+    @classmethod
+    @abstractmethod
+    def _get_summary_model(cls) -> Any:
+        """Return backend-specific Summary model class."""
+        ...
+
+    @classmethod
+    @abstractmethod
+    def _get_session_model(cls) -> Any:
+        """Return backend-specific Session model class."""
+        ...
+
+    @classmethod
+    @abstractmethod
+    def _get_user_model(cls) -> Any:
+        """Return backend-specific User model class."""
+        ...
+
+    @classmethod
     async def generate_chat_name(
         cls,
         *,
@@ -57,66 +94,180 @@ class SessionManager(ABC):
         session_id: str | None = None,
         client_id: str | None = None,
     ) -> str:
-        """
-        Generate a chat name using backend-specific context retrieval and provider calls.
+        """Generate a chat name using backend-specific context retrieval and provider calls."""
+        chat_name_llm_config = LLMModelConfig(
+            provider=CHAT_NAME_LLM_PROVIDER,
+            api_type=CHAT_NAME_LLM_API_TYPE,
+            model=CHAT_NAME_MODEL,
+            temperature=CHAT_NAME_TEMPERATURE,
+            request_kwargs=CHAT_NAME_REQUEST_KWARGS,
+        )
+        llm_provider = get_llm_provider(
+            provider_name=chat_name_llm_config.provider,
+            api_type=chat_name_llm_config.api_type,
+        )
 
-        Must be implemented by backend-specific session managers.
-        """
-        ...
+        if not session_id or not client_id:
+            return await llm_provider.generate_chat_name(
+                query=query,
+                llm_config=chat_name_llm_config,
+                max_chat_name_length=max_chat_name_length,
+                max_chat_name_words=max_chat_name_words,
+            )
 
-    @abstractmethod
+        session_model = cls._get_session_model()
+        session = await session_model.get_by_id_and_client_id(
+            session_id=session_id,
+            client_id=client_id,
+        )
+        if session is None:
+            return await llm_provider.generate_chat_name(
+                query=query,
+                llm_config=chat_name_llm_config,
+                max_chat_name_length=max_chat_name_length,
+                max_chat_name_words=max_chat_name_words,
+            )
+
+        message_model = cls._get_message_model()
+        summary_model = cls._get_summary_model()
+        chat_name_context_max_messages = 2 * turns_between_chat_name
+        summary_task = summary_model.get_latest_by_session(session_id=session_id)
+        messages_task = message_model.get_paginated_by_session(
+            session_id=session_id,
+            page=1,
+            page_size=chat_name_context_max_messages,
+        )
+        summary, messages = await asyncio.gather(summary_task, messages_task)
+
+        conversation_to_summarize = message_model.to_dtos(messages) if messages else None
+        return await llm_provider.generate_chat_name(
+            query=query,
+            llm_config=chat_name_llm_config,
+            previous_summary=summary,
+            conversation_to_summarize=conversation_to_summarize,
+            max_chat_name_length=max_chat_name_length,
+            max_chat_name_words=max_chat_name_words,
+        )
+
+    async def get_latest_summary_for_fallback(self) -> SummaryProtocol | None:
+        """Return latest persisted summary for fallback/error handling paths."""
+        if not self.session:
+            return None
+        summary_model = self._get_summary_model()
+        return await summary_model.get_latest_by_session(session_id=str(self.session.id))
+
+    async def _empty_session(self) -> None:
+        return None
+
+    @trace_method(
+        kind=CustomSpanKinds.DATABASE.value,
+        graph_node_id="fetch_user_or_session",
+        capture_input=False,
+        capture_output=False,
+    )
     async def _fetch_user_or_session(self) -> None:
-        """
-        Fetch user and session in parallel based on client_id and session_id.
-        
-        Sets instance variables:
-        - self.new_user = True if user not found
-        - self.new_chat = True if session not found (or new user)
-        - self.user and self.session populated if found or created
-        
-        If user not found: creates user + session atomically.
-        If user found but session not found: creates session for existing user.
-        
-        Must be implemented by subclasses for specific database backends.
-        """
-        ...
+        """Fetch/create user and session using backend-specific models."""
+        user_model = self._get_user_model()
+        session_model = self._get_session_model()
+        user_task = user_model.get_by_client_id(self.user_client_id)
+        session_task = (
+            session_model.get_by_id_and_client_id(self.session_id, self.user_client_id)
+            if self.session_id
+            else self._empty_session()
+        )
+        self.user, self.session = await asyncio.gather(user_task, session_task)
 
-    @abstractmethod
+        if not self.user:
+            self.new_user = True
+            self.new_chat = True
+            self.session = await session_model.create_with_user(
+                client_id=self.user_client_id,
+                session_id=self.session_id,
+            )
+            return
+
+        if not self.session:
+            self.new_chat = True
+            self.session = await session_model.create_for_existing_user(
+                user=self.user,
+                session_id=self.session_id,
+            )
+
+    @trace_method(
+        kind=CustomSpanKinds.DATABASE.value,
+        graph_node_id="fetch_context",
+        capture_input=False,
+        capture_output=False,
+    )
     async def _fetch_context(self) -> Tuple[List[MessageProtocol], SummaryProtocol | None]:
-        """
-        Fetch the latest N turns (as messages) and the latest summary in parallel.
-        
-        Returns:
-            Tuple of (messages, summary) where messages is a list of Message objects
-            from the latest turns and summary is the latest Summary or None.
-        
-        Must be implemented by subclasses for specific database backends.
-        """
-        ...
+        """Fetch latest messages and summary for the active session."""
+        if self.new_chat or not self.session_id:
+            return [], None
 
-    @abstractmethod
+        message_model = self._get_message_model()
+        summary_model = self._get_summary_model()
+        messages_task = message_model.get_latest_by_session(
+            session_id=str(self.session_id),
+            current_turn_number=self.state.turn_number,
+            max_turns=MAX_TURNS_TO_FETCH,
+        )
+        summary_task = summary_model.get_latest_by_session(session_id=str(self.session_id))
+        messages, summary = await asyncio.gather(messages_task, summary_task)
+        return messages, summary
+
+    def _convert_messages_to_dtos(self, messages: List[MessageProtocol]) -> List[MessageDTO]:
+        """Convert backend messages to MessageDTO."""
+        message_model = self._get_message_model()
+        return message_model.to_dtos(messages)
+
+    @trace_method(
+        kind=CustomSpanKinds.DATABASE.value,
+        graph_node_id="session_updater",
+        capture_input=False,
+        capture_output=False,
+    )
     async def update_user_session(
-        self, 
-        messages: List[MessageDTO], 
-        summary: SummaryProtocol | None, 
+        self,
+        messages: List[MessageDTO],
+        summary: SummaryProtocol | None,
         regenerated_summary: bool,
         on_stream_event: StreamCallback | None = None,
     ) -> List[MessageDTO]:
-        """
-        Create/update user and session, then insert messages.
-        
-        Must be implemented by subclasses for specific database backends.
-        """
-        ...
+        """Persist messages and optional regenerated summary for current session."""
+        if not self.session:
+            return messages
 
-    @abstractmethod
-    def _convert_messages_to_dtos(self, messages: List[MessageProtocol]) -> List[MessageDTO]:
-        """
-        Convert database message objects to MessageDTOs.
-        
-        Must be implemented by subclasses for specific database backends.
-        """
-        ...
+        turn_number = self.state.turn_number
+        try:
+            persisted_summary = summary
+            if regenerated_summary and summary is not None:
+                summary_model = self._get_summary_model()
+                persisted_summary = await summary_model.create_with_session_id(
+                    session_id=str(self.session.id),
+                    summary=summary,
+                )
+
+            await self.session.insert_messages(
+                messages=messages,
+                turn_number=turn_number,
+                previous_summary=persisted_summary,
+            )
+        except Exception as exc:
+            logger.error(f"Failed to insert messages for session {self.session_id}: {exc}")
+            if not messages:
+                return messages
+
+            messages = self.create_fallback_messages(messages[0])
+            if on_stream_event:
+                await stream_fallback_response(on_stream_event, messages[-1])
+
+            await self.session.insert_messages(
+                messages=messages,
+                turn_number=turn_number,
+                previous_summary=summary,
+            )
+
+        return messages
 
     def update_state(self, **kwargs) -> None:
         """

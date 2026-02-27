@@ -13,7 +13,6 @@ from omniagent.exceptions import (
     MaxStepsReachedError,
 )
 from omniagent.domain_protocols import SummaryProtocol
-from omniagent.db.mongo import get_summary_model
 from omniagent.types.message import MessageDTO
 from omniagent.session import SessionManager
 from omniagent.tracing import trace_method
@@ -221,10 +220,7 @@ class Runner:
             # Try to get summary: use existing, fetch from DB, or None
             previous_summary = summary
             if not previous_summary and self.session_manager.session:
-                SummaryModel = get_summary_model()
-                previous_summary = await SummaryModel.get_latest_by_session(
-                    session_id=str(self.session_manager.session.id)
-                )
+                previous_summary = await self.session_manager.get_latest_summary_for_fallback()
             
             return QueryResult(
                 messages=fallback_messages,

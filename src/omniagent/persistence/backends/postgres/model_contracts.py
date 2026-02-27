@@ -1,17 +1,17 @@
-"""Mongo-specific validation helpers for document model contracts."""
+"""Postgres-specific validation helpers for model contracts."""
 
 from __future__ import annotations
 
 import inspect
 from typing import Any, Iterable
 
-from omniagent.db.mongo import DocumentModels
+from omniagent.db.postgres import PostgresModels
 from omniagent.domain_protocols import MessageProtocol, SessionProtocol, SummaryProtocol, UserProtocol
 
 
 def _has_model_field(model: type[Any], field_name: str) -> bool:
-    model_fields = getattr(model, "model_fields", None)
-    if isinstance(model_fields, dict) and field_name in model_fields:
+    table = getattr(model, "__table__", None)
+    if table is not None and field_name in table.columns:
         return True
     return hasattr(model, field_name)
 
@@ -39,8 +39,8 @@ def _validate_model_protocol_contract(model: type[Any], protocol: type[Any], mod
         )
 
 
-def validate_document_models(models: DocumentModels) -> None:
-    """Validate Mongo document models against domain protocols."""
+def validate_document_models(models: PostgresModels) -> None:
+    """Validate Postgres models against domain protocols."""
     _validate_model_protocol_contract(models.user, UserProtocol, "User model")
     _validate_model_protocol_contract(models.session, SessionProtocol, "Session model")
     _validate_model_protocol_contract(models.message, MessageProtocol, "Message model")
@@ -115,8 +115,8 @@ def _validate_method_contract(
             )
 
 
-def validate_repository_models(models: DocumentModels) -> None:
-    """Validate repository-required methods on configured Mongo model classes."""
+def validate_repository_models(models: PostgresModels) -> None:
+    """Validate repository-required methods on configured Postgres model classes."""
     model_map = {
         "User model": models.user,
         "Session model": models.session,

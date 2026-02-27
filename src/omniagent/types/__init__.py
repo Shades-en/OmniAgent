@@ -11,6 +11,7 @@ from omniagent.types.message import (
 from omniagent.types.chat import MessageQuery, RunnerOptions
 from omniagent.types.llm import APIType, LLMModelConfig, SummaryLLMOverrides
 from omniagent.types.state import State
+from omniagent.types.summary import GeneratedSummary
 from omniagent.types.user import UserType
 
 __all__ = [
@@ -29,6 +30,8 @@ __all__ = [
     "RunnerOptions",
     # State types
     "State",
+    # Summary types
+    "GeneratedSummary",
     # User types
     "UserType",
 ]

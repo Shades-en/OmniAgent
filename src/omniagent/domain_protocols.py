@@ -22,7 +22,9 @@ class UserProtocol(Protocol):
 class SummaryProtocol(Protocol):
     """Protocol for Summary objects."""
     content: str
+    start_turn_number: int
     end_turn_number: int
+    token_count: int
 
 
 @runtime_checkable

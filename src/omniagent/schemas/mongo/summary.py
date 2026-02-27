@@ -12,6 +12,7 @@ from pydantic import model_validator
 
 from omniagent.tracing import trace_method
 
+from omniagent.domain_protocols import SummaryProtocol
 from omniagent.exceptions import (
     SummaryRetrievalError,
     SummaryCreationError,
@@ -68,14 +69,37 @@ class Summary(PublicDictMixin, Document):
         capture_input=False,
         capture_output=False
     )
-    async def create_with_session(cls, session: "Session", summary: "Summary") -> "Summary":
-        """Create a new summary for a session."""
+    async def create_with_session_id(
+        cls,
+        session_id: str,
+        summary: SummaryProtocol,
+    ) -> "Summary":
+        """Create a new summary for a session id."""
         try:
-            summary.session = session
-            await summary.insert()
-            return summary
+            session_obj_id = ObjectId(session_id)
+            from omniagent.db.mongo import get_session_model
+
+            session_model = get_session_model()
+            session = await session_model.get(session_obj_id)
+            if session is None:
+                raise SummaryCreationError(
+                    "Failed to create summary for session",
+                    details=f"session_id={session_id}, reason=session_not_found",
+                )
+
+            summary_doc = cls(
+                content=summary.content,
+                token_count=summary.token_count,
+                start_turn_number=summary.start_turn_number,
+                end_turn_number=summary.end_turn_number,
+                session=session,
+            )
+            await summary_doc.insert()
+            return summary_doc
         except Exception as e:
+            if isinstance(e, SummaryCreationError):
+                raise
             raise SummaryCreationError(
                 "Failed to create summary for session",
-                details=f"session_id={session.id}, summary={summary}, error={str(e)}"
+                details=f"session_id={session_id}, summary={summary}, error={str(e)}"
             )
