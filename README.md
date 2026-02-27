@@ -290,5 +290,3 @@ Contributions are welcome! Please open an issue or submit a pull request.
 
 # TODO
 1. Add file upload support in runner flow
-2. Remove mock functionality -> Past this make twitter bot (Important)
-3. Maybe just maybe the repositories can be made one??

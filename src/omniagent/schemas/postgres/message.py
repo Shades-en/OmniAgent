@@ -11,10 +11,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from omniagent.config import DEFAULT_MESSAGE_PAGE_SIZE, MAX_TURNS_TO_FETCH
 from omniagent.db.postgres.engine import get_sessionmaker
 from omniagent.exceptions import MessageDeletionError, MessageRetrievalError
+from omniagent.types.message import MessageDTO, Role
+
 from omniagent.schemas.postgres.base import PostgresBase
 from omniagent.schemas.postgres.mixins import CreatedAtMixin
 from omniagent.schemas.postgres.public_dict import PublicDictMixin
-from omniagent.types.message import MessageDTO, Role
 
 if TYPE_CHECKING:
     from omniagent.schemas.postgres.session import Session

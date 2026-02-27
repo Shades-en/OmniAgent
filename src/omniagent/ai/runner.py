@@ -82,18 +82,7 @@ class Runner:
         
         Traced as INTERNAL span for parallel LLM operations.
         """
-        # Use mock methods if MOCK_AI_RESPONSE is enabled
-        if config.MOCK_AI_RESPONSE:
-            return await asyncio.gather(
-                self.agent.llm_provider.mock_generate_response(step=self.session_manager.state.step),
-                self.agent.llm_provider.mock_generate_summary(
-                    query=query,
-                    turns_after_last_summary=self.session_manager.state.turns_after_last_summary,
-                    turn_number=self.session_manager.state.turn_number
-                ),
-            )
-        
-        # Use real LLM methods - stream only if options.stream is True AND callback provided
+        # Stream only if options.stream is True AND callback provided.
         stream_enabled = self.options.stream and on_stream_event is not None
         return await asyncio.gather(
             self.agent.llm_provider.generate_response(

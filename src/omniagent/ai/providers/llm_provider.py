@@ -2,14 +2,10 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Callable, Awaitable, Any
 import inspect
 
-from omniagent import config
 from omniagent.domain_protocols import SummaryProtocol
-from omniagent.types.summary import GeneratedSummary
 from omniagent.types.message import MessageDTO
 from omniagent.types.llm import LLMModelConfig
 from omniagent.ai.tools.tools import Tool
-from omniagent.config import AISDK_ID_LENGTH
-from omniagent.utils.general import generate_id
 
 
 StreamEvent = dict[str, Any]
@@ -185,69 +181,3 @@ class LLMProvider(ABC):
             if tool.name == function_name:
                 return await tool(tool.Arguments(**function_arguments))
         return ""
-    
-    @classmethod
-    async def mock_generate_response(cls, step: int) -> tuple[List[MessageDTO], bool]:
-        """
-        Mock implementation of generate_response for testing purposes.
-        Returns a dummy AI message with random content and tool_call as False.
-        
-        Returns:
-            Tuple of ([MessageDTO], False) where MessageDTO contains dummy content
-        """
-        mock_message = MessageDTO.create_ai_message(
-            message_id=generate_id(AISDK_ID_LENGTH, "nanoid"),
-            metadata={"mock": True}
-        ).update_ai_text_message(
-            text="This is a mock AI response. The actual LLM call has been bypassed for testing purposes."
-        )
-        
-        return [mock_message], False
-    
-    @classmethod
-    async def mock_generate_summary(
-        cls,
-        query: str,
-        turns_after_last_summary: int = 0,
-        turn_number: int = 1,
-    ) -> SummaryProtocol | None:
-        """
-        Mock implementation of generate_summary for testing purposes.
-        Returns dummy summary without making actual LLM calls.
-        
-        Returns:
-            Mock Summary object or None
-        """
-        if config.MOCK_AI_SUMMARY:
-            mock_summary = "Mock summary: This is a test summary of the conversation without actual LLM processing."
-            return GeneratedSummary(
-                content=mock_summary,
-                end_turn_number=turn_number-1,
-                start_turn_number=turn_number-turns_after_last_summary,
-                token_count=0,
-            )
-        return None
-
-    @classmethod
-    async def mock_generate_chat_name(
-        cls,
-        query: str,
-        previous_summary: SummaryProtocol | None = None,
-        conversation_to_summarize: List[MessageDTO] | None = None,
-        max_chat_name_length: int = 50,
-        max_chat_name_words: int = 5,
-    ) -> str:
-        """
-        Mock implementation of generate_chat_name for testing purposes.
-        Returns dummy chat name without making actual LLM calls.
-        
-        Returns:
-            Mock chat name string
-        """
-        context_hint = ""
-        if previous_summary:
-            context_hint = " (summary context)"
-        elif conversation_to_summarize:
-            context_hint = " (recent convo)"
-        query_words = query.split()[:max_chat_name_words]
-        return f"Mock Chat{context_hint}: {' '.join(query_words)}"

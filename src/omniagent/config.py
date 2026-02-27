@@ -32,9 +32,6 @@ for provider_name, provider_api_type in LLM_PROVIDER_DEFAULT_API_TYPE_MAP.items(
             f"'{provider_api_type}' for provider '{provider_name}'. "
             f"Valid values are: {sorted(_VALID_LLM_API_TYPES)}"
         )
-MOCK_AI_RESPONSE = _env_flag("MOCK_AI_RESPONSE", False)
-MOCK_AI_CHAT_NAME = _env_flag("MOCK_AI_CHAT_NAME", False)
-MOCK_AI_SUMMARY = _env_flag("MOCK_AI_SUMMARY", False)
 
 # Model Configuration
 BASE_MODEL = os.getenv("BASE_MODEL", GPT_4_1_MINI)
